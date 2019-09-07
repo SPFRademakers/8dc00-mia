@@ -44,11 +44,13 @@ def transforms_test():
 def combining_transforms():
 
     X = util.test_object(1)
-
-    #------------------------------------------------------------------#
-    # TODO: Experiment with combining transformation matrices.
-    #------------------------------------------------------------------#
-
+    X_t = reg.reflect(-1,1)*reg.rotate(np.pi/2)*X
+    
+    fig = plt.figure(figsize=(5,5))
+    ax1  = fig.add_subplot(111)
+    util.plot_object(ax1, X)
+    util.plot_object(ax1, X_t)
+    ax1.grid()
 
 def t2h_test():
 

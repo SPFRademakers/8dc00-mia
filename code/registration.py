@@ -69,8 +69,9 @@ def reflect(rx, ry):
     if rx not in allowed or ry not in allowed:
         T = 'Invalid input parameter'
         return T
-    else
-        T = np.array([[rx,0],[0,ry]])
+    
+    T = np.array([[rx,0],[0,ry]])
+    
     return T
 
 
