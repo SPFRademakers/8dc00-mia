@@ -44,13 +44,14 @@ def transforms_test():
 def combining_transforms():
 
     X = util.test_object(1)
-    X_t = reg.reflect(-1,1)*reg.rotate(np.pi/2)*X
+    T = reg.reflect(-1,1).dot(reg.rotate(np.pi/2))
+    X_t = T.dot(X)
     
     fig = plt.figure(figsize=(5,5))
     ax1  = fig.add_subplot(111)
+    ax1.grid()
     util.plot_object(ax1, X)
     util.plot_object(ax1, X_t)
-    ax1.grid()
 
 def t2h_test():
 
@@ -77,18 +78,24 @@ def t2h_test():
 def arbitrary_rotation():
 
     X = util.test_object(1)
-    Xh = util.c2h(X)
+    Xh = util.c2h(X)       #the object in homogeneous form
 
     #------------------------------------------------------------------#
-    # TODO: TODO: Perform rotation of the test shape around the first vertex
+    Xt = np.array(X[:,0])
+    T_rot = reg.rotate(np.pi/4)
+    
+    Xt_down = util.t2h(reg.identity(), -Xt)    #with Xt being the translation vector set into homogeneous form
+    Xt_up = util.t2h(reg.identity(), Xt)
+    T_rot = util.t2h(T_rot,np.array([0,0]))  #with T being the rotational vector set into homogeneous form
+ 
+    T  = Xt_up.dot(T_rot).dot(Xt_down)
+    X_fin = T.dot(Xh)
     #------------------------------------------------------------------#
-
-    X_rot = T.dot(Xh)
-
+    
     fig = plt.figure(figsize=(5,5))
     ax1 = fig.add_subplot(111)
     util.plot_object(ax1, X)
-    util.plot_object(ax1, X_rot)
+    util.plot_object(ax1, X_fin)
     ax1.set_xlim(ax1.get_ylim())
     ax1.grid()
 

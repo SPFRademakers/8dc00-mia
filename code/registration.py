@@ -107,7 +107,8 @@ def image_transform(I, Th,  output_shape=None):
     Xh = util.c2h(X)
 
     #------------------------------------------------------------------#
-    # TODO: Perform inverse coordinates mapping.
+    T_inv = np.linalg.inv(Th)
+    Xt = T_inv.dot(Xh)
     #------------------------------------------------------------------#
 
     It = ndimage.map_coordinates(I, [Xt[1,:], Xt[0,:]], order=1, mode='constant').reshape(I.shape)
