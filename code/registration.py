@@ -125,9 +125,7 @@ def ls_solve(A, b):
     # w - least-squares solution to the system of equations
     # E - squared error for the optimal solution
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the least-squares solution for w.
-    #------------------------------------------------------------------#
+    w = np.linalg.inv(np.transpose(A).dot(A)).dot(np.transpose(A)).dot(b)
 
     # compute the error
     E = np.transpose(A.dot(w) - b).dot(A.dot(w) - b)
@@ -144,11 +142,12 @@ def ls_affine(X, Xm):
     # T - affine transformation in homogeneous form.
 
     A = np.transpose(Xm)
+    bx = X[0, :]
+    by = X[1, :]
 
-    #------------------------------------------------------------------#
-    # TODO: Implement least-squares fitting of an affine transformation.
-    # Use the ls_solve() function that you have previously implemented.
-    #------------------------------------------------------------------#
+    Tx = bx.dot(np.linalg.inv(A))
+    Ty = by.dot(np.linalg.inv(A))
+    T = np.array([Tx, Ty])
 
     return T
 
