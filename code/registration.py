@@ -140,13 +140,12 @@ def ls_affine(X, Xm):
     # Xm - Corresponding points in the moving image
     # Output:
     # T - affine transformation in homogeneous form.
-
     A = np.transpose(Xm)
     bx = X[0, :]
     by = X[1, :]
 
-    Tx = bx.dot(np.linalg.inv(A))
-    Ty = by.dot(np.linalg.inv(A))
+    Tx, Ex = ls_solve(A, bx)
+    Ty, Ey = ls_solve(A, by)
     T = np.array([Tx, Ty])
 
     return T

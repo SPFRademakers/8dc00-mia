@@ -152,7 +152,6 @@ def ls_solve_test():
 def ls_affine_test():
 
     X = util.test_object(1)
-
     # convert to homogeneous coordinates
     Xh = util.c2h(X)
 
