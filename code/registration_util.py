@@ -42,8 +42,7 @@ def t2h(T, t):
     # t - 2D translation vector
     # Output:
     # Th - homogeneous transformation matrix
-    
-    #------------------------------------------------------------------#
+
     Tt = np.zeros((2,3))
     Tt[0][0] = T[0][0]
     Tt[0][1] = T[0][1]
@@ -55,8 +54,8 @@ def t2h(T, t):
     n = np.zeros([1,Tt.shape[1]])
     n[0][-1] = 1
     Th = np.concatenate((Tt,n), axis=0)
+
     return Th
-    #------------------------------------------------------------------#
 
 
 def plot_object(ax, X):
@@ -78,8 +77,12 @@ def my_cpselect(I_path, Im_path):
     # X - control points in the fixed image
     # Xm - control points in the moving image
 
-    #------------------------------------------------------------------#
-    # TODO: Call cpselect and modify the returned point coordinates.
-    #------------------------------------------------------------------#
+    X = []
+    Xm = []
+
+    cplist = cpselect(I_path, Im_path)
+    for ind in cplist:
+        X.append([ind["img1_x"], ind["img1_y"]])
+        Xm.append([ind["img2_x"], ind["img2_y"]])
 
     return X, Xm

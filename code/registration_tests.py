@@ -53,6 +53,7 @@ def combining_transforms():
     util.plot_object(ax1, X)
     util.plot_object(ax1, X_t)
 
+
 def t2h_test():
 
     X = util.test_object(1)
@@ -199,10 +200,8 @@ def correlation_test():
     # the self correlation should be very close to 1
     assert abs(C1 - 1) < 10e-10, "Correlation function is incorrectly implemented (self correlation test)"
 
-    #------------------------------------------------------------------#
-    # TODO: Implement a few more tests of the correlation definition
-    #------------------------------------------------------------------#
-
+    C2 = reg.correlation(I, -I)
+    print(C2)
     print('Test successful!')
 
 
@@ -214,9 +213,9 @@ def mutual_information_test():
     p1 = reg.joint_histogram(I, I)
     MI1 = reg.mutual_information(p1)
 
-    #------------------------------------------------------------------#
-    # TODO: Implement a few tests of the mutual_information definition
-    #------------------------------------------------------------------#
+    noise = np.random.randint(225, size=(512, 512))
+    p2 = reg.joint_histogram(noise, noise)
+    MI2 = reg.mutual_information(p2)
 
     print('Test successful!')
 
@@ -232,6 +231,7 @@ def mutual_information_e_test():
     p1 = reg.joint_histogram(I, I)
     MI1 = reg.mutual_information_e(p1)
     MI2 = reg.mutual_information(p1)
+
     assert abs(MI1-MI2) < 10e-3, "Mutual information function with entropy is incorrectly implemented (difference with reference implementation test)"
 
     print('Test successful!')

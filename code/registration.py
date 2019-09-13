@@ -5,6 +5,7 @@ Registration module main code.
 import numpy as np
 from scipy import ndimage
 import registration_util as util
+import math
 
 
 # SECTION 1. Geometrical transformations
@@ -106,10 +107,8 @@ def image_transform(I, Th,  output_shape=None):
     # convert to homogeneous coordinates
     Xh = util.c2h(X)
 
-    #------------------------------------------------------------------#
     T_inv = np.linalg.inv(Th)
     Xt = T_inv.dot(Xh)
-    #------------------------------------------------------------------#
 
     It = ndimage.map_coordinates(I, [Xt[1,:], Xt[0,:]], order=1, mode='constant').reshape(I.shape)
 
@@ -151,7 +150,7 @@ def ls_affine(X, Xm):
     return T
 
 
-# SECTION 3. Image simmilarity metrics
+# SECTION 3. Image similarity metrics
 
 
 def correlation(I, J):
@@ -172,10 +171,7 @@ def correlation(I, J):
     u = u - u.mean(keepdims=True)
     v = v - v.mean(keepdims=True)
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the computation of the normalized cross-correlation.
-    # This can be done with a single line of code, but you can use for-loops instead.
-    #------------------------------------------------------------------#
+    CC = (np.transpose(u).dot(v))/(math.sqrt(np.transpose(u).dot(u))*math.sqrt(np.transpose(v).dot(v)))
 
     return CC
 
@@ -185,7 +181,7 @@ def joint_histogram(I, J, num_bins=16, minmax_range=None):
     # Input:
     # I, J - input images
     # num_bins: number of bins of the joint histogram (default: 16)
-    # range - range of the values of the signals (defaul: min and max
+    # range - range of the values of the signals (default: min and max
     # of the inputs)
     # Output:
     # p - joint histogram
@@ -193,13 +189,11 @@ def joint_histogram(I, J, num_bins=16, minmax_range=None):
     if I.shape != J.shape:
         raise AssertionError("The inputs must be the same size.")
 
-    # make sure the inputs are column-vectors of type double (highest
-    # precision)
+    # make sure the inputs are column-vectors of type double (highest precision)
     I = I.reshape((I.shape[0]*I.shape[1],1)).astype(float)
     J = J.reshape((J.shape[0]*J.shape[1],1)).astype(float)
 
-    # if the range is not specified use the min and max values of the
-    # inputs
+    # if the range is not specified use the min and max values of the inputs
     if minmax_range is None:
         minmax_range = np.array([min(min(I),min(J)), max(max(I),max(J))])
 
@@ -212,7 +206,7 @@ def joint_histogram(I, J, num_bins=16, minmax_range=None):
     J = np.round(J*(num_bins-1)).astype(int)
 
     n = I.shape[0]
-    hist_size = np.array([num_bins,num_bins])
+    hist_size = np.array([num_bins, num_bins])
 
     # initialize the joint histogram to all zeros
     p = np.zeros(hist_size)
@@ -220,12 +214,7 @@ def joint_histogram(I, J, num_bins=16, minmax_range=None):
     for k in range(n):
         p[I[k], J[k]] = p[I[k], J[k]] + 1
 
-    #------------------------------------------------------------------#
-    # TODO: At this point, p contains the counts of cooccuring
-    # intensities in the two images. You need to implement one final
-    # step to make p take the form of a probability mass function
-    # (p.m.f.).
-    #------------------------------------------------------------------#
+    p[I, J] = p[I, J]/len(I)
 
     return p
 
@@ -250,14 +239,16 @@ def mutual_information(p):
     p_J = np.sum(p, axis=0)
     p_J = p_J.reshape(1, -1)
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the computation of the mutual information from p,
-    # p_I and p_J. This can be done with a single line of code, but you
-    # can use a for-loop instead.
-    # HINT: p_I is a column-vector and p_J is a row-vector so their
-    # product is a matrix. You can also use the sum() function here.
-    #------------------------------------------------------------------#
+    n = len(p_I)
+    MI = 0
 
+    # double summation for each coordinate in MI(I,J)
+    for i in range(n):
+        for j in range(n):
+            MI = MI + p[i, j]*np.log(p[i, j]/(p_I[i, 0]*p_J[0, j]))
+
+    # Another way I think this can be written down is:
+    # MI = sum(p.*math.log10(p./(p_I.*p_J)))
     return MI
 
 
@@ -282,10 +273,14 @@ def mutual_information_e(p):
     p_J = np.sum(p, axis=0)
     p_J = p_J.reshape(1, -1)
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the computation of the mutual information via
-    # computation of entropy.
-    #------------------------------------------------------------------#
+    un = np.unique(p)
+    un = un[1:]
+
+    entropy1 = -sum(p_I*np.log(p_I))
+    entropy2 = -sum(np.transpose(p_J)*np.log(np.transpose(p_J)))
+    jointentropy = -sum(un*np.log(un))
+
+    MI = entropy1 + entropy2 - jointentropy
 
     return MI
 
