@@ -8,12 +8,88 @@ import registration as reg
 from IPython.display import display, clear_output
 
 
+def rigid_corr(I, Im, x, MI = True):
+    # Computes normalized cross-correlation between a fixed and
+    # a moving image transformed with a rigid transformation.
+    # Input:
+    # I - fixed image
+    # Im - moving image
+    # x - parameters of the rigid transform: the first element
+    #     is the rotation angle and the remaining two elements
+    #     are the translation
+    # Output:
+    # C - normalized cross-correlation between I and T(Im)
+    # Im_t - transformed moving image T(Im)
+
+    SCALING = 100
+
+    # the first element is the rotation angle
+    T = rotate(x[0])
+
+    # the remaining two element are the translation
+    #
+    # the gradient ascent/descent method work best when all parameters
+    # of the function have approximately the same range of values
+    # this is  not the case for the parameters of rigid registration
+    # where the transformation matrix usually takes  much smaller
+    # values compared to the translation vector this is why we pass a
+    # scaled down version of the translation vector to this function
+    # and then scale it up when computing the transformation matrix
+    Th = util.t2h(T, x[1:]*SCALING)
+
+    # transform the moving image
+    Im_t, Xt = image_transform(Im, Th)
+
+    # compute the similarity between the fixed and transformed moving image
+    # ADD CODE TO DIFFERENTIATE BETWEEN C AND MI
+    C = correlation(I, Im_t)
+
+    return C, Im_t, Th
+
+
+def affine_corr(I, Im, x, MI = True):
+    # Computes normalized cross-correlation between a fixed and
+    # a moving image transformed with an affine transformation.
+    # Input:
+    # I - fixed image
+    # Im - moving image
+    # x - parameters of the rigid transform: the first element
+    #     is the rotation angle, the second and third are the
+    #     scaling parameters, the fourth and fifth are the
+    #     shearing parameters and the remaining two elements
+    #     are the translation
+    # Output:
+    # C - normalized cross-correlation between I and T(Im)
+    # Im_t - transformed moving image T(Im)
+
+    NUM_BINS = 64
+    SCALING = 100
+
+    Tro = rotate(x[0])
+    Tsc = scale(x[1], x[2])
+    Tsh = shear(x[3], x[4])
+    Trss = Tro.dot(Tsc).dot(Tsh)
+    Th = util.t2h(Trss, [x[5], x[6]])
+
+    Im_t, Xt = image_transform(Im, Th)
+
+    # ADD CODE TO DIFFERENTIATE BETWEEN C AND MI
+    C = correlation(I, Im_t)
+
+    return C, Im_t, Th
+
+
 def intensity_based_registration(I, Im, Affine = True, MI = True):
 
     # calling whether to use affine or rigid-based transformation
     if Affine:
         x = np.array([0., 1., 1., 0., 0., 0., 0.])
-        fun = lambda x: reg.affine_corr(I, Im, x)
+        # don't know for sure if there needs to be an if statement here or
+        # in the affine_corr rigid_corr functions
+        if MI:
+            fun = lambda x: reg.affine_corr(I, Im, x, MI)
+        else:
+            fun = lambda x: reg.affine_corr(I, Im, x, MI)
     else:
         x = np.array([0., 0., 0.])
         fun = lambda x: reg.rigid_corr(I, Im, x)
