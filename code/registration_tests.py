@@ -167,7 +167,7 @@ def ls_affine_test():
 
     Te = reg.ls_affine(Xh, Xm)
 
-    Xmt = Te.dot(Xm);
+    Xmt = Te.dot(Xm)
 
     fig = plt.figure(figsize=(12,5))
 

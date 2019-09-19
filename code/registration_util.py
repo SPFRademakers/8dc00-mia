@@ -29,8 +29,8 @@ def c2h(X):
     # Output:
     # Xh - homogeneous coordinates
 
-    n = np.ones([1,X.shape[1]])
-    Xh = np.concatenate((X,n))
+    n = np.ones([1, X.shape[1]])
+    Xh = np.concatenate((X, n))
 
     return Xh
 
@@ -43,7 +43,7 @@ def t2h(T, t):
     # Output:
     # Th - homogeneous transformation matrix
 
-    Tt = np.zeros((2,3))
+    Tt = np.zeros((2, 3))
     Tt[0][0] = T[0][0]
     Tt[0][1] = T[0][1]
     Tt[1][0] = T[1][0]
@@ -64,7 +64,7 @@ def plot_object(ax, X):
     # Input:
     # X - coordinates of the shape
 
-    ax.plot(X[0,:], X[1,:], linewidth=2)
+    ax.plot(X[0, :], X[1, :], linewidth=2)
 
 
 def my_cpselect(I_path, Im_path):
@@ -77,12 +77,19 @@ def my_cpselect(I_path, Im_path):
     # X - control points in the fixed image
     # Xm - control points in the moving image
 
-    X = []
-    Xm = []
+    Xx = []
+    Xy = []
+    Xmx = []
+    Xmy = []
 
     cplist = cpselect(I_path, Im_path)
     for ind in cplist:
-        X.append([ind["img1_x"], ind["img1_y"]])
-        Xm.append([ind["img2_x"], ind["img2_y"]])
+        Xx.append(ind["img1_x"])
+        Xy.append(ind["img1_y"])
+        Xmx.append(ind["img2_x"])
+        Xmy.append(ind["img2_y"])
+
+    X = np.array([Xx, Xy])
+    Xm = np.array([Xmx, Xmy])
 
     return X, Xm

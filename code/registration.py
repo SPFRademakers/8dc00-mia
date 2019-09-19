@@ -91,7 +91,7 @@ def image_transform(I, Th,  output_shape=None):
     # output to have the same data type as the input - so, we will
     # convert to double and remember the original input type
 
-    input_type = type(I);
+    input_type = type(I)
 
     # default output size is same as input
     if output_shape is None:
@@ -106,7 +106,6 @@ def image_transform(I, Th,  output_shape=None):
     X = np.concatenate((xx.reshape((1, xx.size)), yy.reshape((1, yy.size))))
     # convert to homogeneous coordinates
     Xh = util.c2h(X)
-
     T_inv = np.linalg.inv(Th)
     Xt = T_inv.dot(Xh)
 
@@ -147,6 +146,7 @@ def ls_affine(X, Xm):
     Ty, Ey = ls_solve(A, by)
     T = np.array([Tx, Ty])
 
+
     return T
 
 
@@ -172,7 +172,6 @@ def correlation(I, J):
     v = v - v.mean(keepdims=True)
 
     CC = (np.transpose(u).dot(v))/(math.sqrt(np.transpose(u).dot(u))*math.sqrt(np.transpose(v).dot(v)))
-
     return CC
 
 
@@ -249,6 +248,7 @@ def mutual_information(p):
 
     # Another way I think this can be written down is:
     # MI = sum(p.*math.log10(p./(p_I.*p_J)))
+
     return MI
 
 
@@ -297,11 +297,18 @@ def ngradient(fun, x, h=1e-3):
     # Output:
     # g - vector of partial derivatives (gradient) of fun
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the  computation of the partial derivatives of
-    # the function at x with numerical differentiation.
-    # g[k] should store the partial derivative w.r.t. the k-th parameter
-    #------------------------------------------------------------------#
+    g = []
+    if len(x) == 1:
+        g = (fun(x+h/2)-fun(x-h/2))/h
+    else:
+        g = np.zeros(len(x))
+        for k in range(len(x)):
+            xp = x.copy()
+            xn = x.copy()
+            value = x[k]
+            xp[k] = value + h/2
+            xn[k] = value - h/2
+            g[k] = (fun(xp)[0]-fun(xn)[0])/h
 
     return g
 
@@ -346,26 +353,32 @@ def rigid_corr(I, Im, x):
 
 
 def affine_corr(I, Im, x):
-    # Computes normalized cross-corrleation between a fixed and
+    # Computes normalized cross-correlation between a fixed and
     # a moving image transformed with an affine transformation.
     # Input:
     # I - fixed image
     # Im - moving image
     # x - parameters of the rigid transform: the first element
-    #     is the roation angle, the second and third are the
+    #     is the rotation angle, the second and third are the
     #     scaling parameters, the fourth and fifth are the
     #     shearing parameters and the remaining two elements
     #     are the translation
     # Output:
-    # C - normalized cross-corrleation between I and T(Im)
+    # C - normalized cross-correlation between I and T(Im)
     # Im_t - transformed moving image T(Im)
 
     NUM_BINS = 64
     SCALING = 100
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the missing functionality
-    #------------------------------------------------------------------#
+    Tro = rotate(x[0])
+    Tsc = scale(x[1], x[2])
+    Tsh = shear(x[3], x[4])
+    Trss = Tro.dot(Tsc).dot(Tsh)
+    Th = util.t2h(Trss, [x[5], x[6]])
+
+    Im_t, Xt = image_transform(Im, Th)
+
+    C = correlation(I, Im_t)
 
     return C, Im_t, Th
 
@@ -387,9 +400,16 @@ def affine_mi(I, Im, x):
 
     NUM_BINS = 64
     SCALING = 100
-    
-    #------------------------------------------------------------------#
-    # TODO: Implement the missing functionality
-    #------------------------------------------------------------------#
+
+    Tro = rotate(x[0])
+    Tsc = scale(x[1], x[2])
+    Tsh = shear(x[3], x[4])
+    Trss = Tro.dot(Tsc).dot(Tsh)
+    Th = util.t2h(Trss, [x[5], x[6]])
+
+    Im_t = Th.dot(Im)
+
+    p = joint_histogram(I, Im_t, NUM_BINS)
+    MI = mutual_information(p)
 
     return MI, Im_t, Th

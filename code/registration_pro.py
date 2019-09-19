@@ -8,48 +8,32 @@ import registration as reg
 from IPython.display import display, clear_output
 
 
-def intensity_based_registration_demo():
+def intensity_based_registration(I, Im, Affine = True, MI = True):
 
-    # read the fixed and moving images
-    # change these in order to read different images
-    I = plt.imread('../data/image_data/1_1_t1.tif')
-    Im = plt.imread('../data/image_data/1_1_t1_d.tif')
-
-    # initial values for the parameters
-    # we start with the identity transformation
-    # most likely you will not have to change these
-
-    #---------------------------------------------------------------------#
-    #x = np.array([0., 0., 0.])
-    #---------------------------------------------------------------------#
-
-    x = np.array([0., 1., 1., 0., 0., 0., 0.])
-
-    # NOTE: for affine registration you have to initialize
-    # more parameters and the scaling parameters should be
-    # initialized to 1 instead of 0
-
-    # the similarity function
-    # this line of code in essence creates a version of rigid_corr()
-    # in which the first two input parameters (fixed and moving image)
-    # are fixed and the only remaining parameter is the vector x with the
-    # parameters of the transformation
-
-    #---------------------------------------------------------------------#
-    #fun = lambda x: reg.rigid_corr(I, Im, x)
-    #---------------------------------------------------------------------#
-
-    fun = lambda x: reg.affine_corr(I, Im, x)
+    # calling whether to use affine or rigid-based transformation
+    if Affine:
+        x = np.array([0., 1., 1., 0., 0., 0., 0.])
+        fun = lambda x: reg.affine_corr(I, Im, x)
+    else:
+        x = np.array([0., 0., 0.])
+        fun = lambda x: reg.rigid_corr(I, Im, x)
 
     # the learning rate
-    #mu = 0.001
-    mu = 0.0005
+    mu = 0.0005  # making code to make it best?
 
     # number of iterations
     num_iter = 200
 
     iterations = np.arange(1, num_iter+1)
-    similarity = np.full((num_iter, 1), np.nan)
+
+    # change this line to MI or CC
+    if MI:
+      p = reg.joint_histogram(I, Im)
+      similarity = reg.mutual_information(p)
+    else:
+      similarity = reg.correlation(I, Im)
+
+    # similarity = np.full((num_iter, 1), np.nan)
 
     fig = plt.figure(figsize=(14, 6))
 
