@@ -2,13 +2,15 @@
 Registration project code.
 """
 
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import registration as reg
+import registration_util as util
 from IPython.display import display, clear_output
 
 
-def rigid_corr(I, Im, x, MI = True):
+def rigid_corr(I, Im, x, MI):
     # Computes normalized cross-correlation between a fixed and
     # a moving image transformed with a rigid transformation.
     # Input:
@@ -24,7 +26,7 @@ def rigid_corr(I, Im, x, MI = True):
     SCALING = 100
 
     # the first element is the rotation angle
-    T = rotate(x[0])
+    T = reg.rotate(x[0])
 
     # the remaining two element are the translation
     #
@@ -38,16 +40,18 @@ def rigid_corr(I, Im, x, MI = True):
     Th = util.t2h(T, x[1:]*SCALING)
 
     # transform the moving image
-    Im_t, Xt = image_transform(Im, Th)
-
+    Im_t, Xt = reg.image_transform(Im, Th)
     # compute the similarity between the fixed and transformed moving image
-    # ADD CODE TO DIFFERENTIATE BETWEEN C AND MI
-    C = correlation(I, Im_t)
+    if MI:
+        p = reg.joint_histogram(I, Im_t)
+        similarity = reg.mutual_information(p)
+    else:
+        similarity = reg.correlation(I, Im_t)
 
-    return C, Im_t, Th
+    return similarity, Im_t, Th
 
 
-def affine_corr(I, Im, x, MI = True):
+def affine_corr(I, Im, x, MI):
     # Computes normalized cross-correlation between a fixed and
     # a moving image transformed with an affine transformation.
     # Input:
@@ -65,51 +69,42 @@ def affine_corr(I, Im, x, MI = True):
     NUM_BINS = 64
     SCALING = 100
 
-    Tro = rotate(x[0])
-    Tsc = scale(x[1], x[2])
-    Tsh = shear(x[3], x[4])
+    Tro = reg.rotate(x[0])
+    Tsc = reg.scale(x[1], x[2])
+    Tsh = reg.shear(x[3], x[4])
     Trss = Tro.dot(Tsc).dot(Tsh)
     Th = util.t2h(Trss, [x[5], x[6]])
 
-    Im_t, Xt = image_transform(Im, Th)
-
+    Im_t, Xt = reg.image_transform(Im, Th)
     # ADD CODE TO DIFFERENTIATE BETWEEN C AND MI
-    C = correlation(I, Im_t)
+    if MI:
+        p = reg.joint_histogram(I, Im_t)
+        similarity = reg.mutual_information(p)
+    else:
+        similarity = reg.correlation(I, Im_t)
 
-    return C, Im_t, Th
+    return similarity, Im_t, Th
 
 
-def intensity_based_registration(I, Im, Affine = True, MI = True):
+def intensity_based_registration(I, Im, Affine = True, MI = True, mu = 0.0005):
+
+    # starting the timer
+    start_time = time.clock()
 
     # calling whether to use affine or rigid-based transformation
     if Affine:
         x = np.array([0., 1., 1., 0., 0., 0., 0.])
-        # don't know for sure if there needs to be an if statement here or
-        # in the affine_corr rigid_corr functions
-        if MI:
-            fun = lambda x: reg.affine_corr(I, Im, x, MI)
-        else:
-            fun = lambda x: reg.affine_corr(I, Im, x, MI)
+        fun = lambda x: affine_corr(I, Im, x, MI)
     else:
         x = np.array([0., 0., 0.])
-        fun = lambda x: reg.rigid_corr(I, Im, x)
-
-    # the learning rate
-    mu = 0.0005  # making code to make it best?
+        fun = lambda x: rigid_corr(I, Im, x, MI)
 
     # number of iterations
     num_iter = 200
 
     iterations = np.arange(1, num_iter+1)
 
-    # change this line to MI or CC
-    if MI:
-      p = reg.joint_histogram(I, Im)
-      similarity = reg.mutual_information(p)
-    else:
-      similarity = reg.correlation(I, Im)
-
-    # similarity = np.full((num_iter, 1), np.nan)
+    similarity = np.full((num_iter, 1), np.nan)
 
     fig = plt.figure(figsize=(14, 6))
 
@@ -136,10 +131,11 @@ def intensity_based_registration(I, Im, Affine = True, MI = True):
 
     # perform 'num_iter' gradient ascent updates
     for k in np.arange(num_iter):
-
         # gradient ascent
         g = reg.ngradient(fun, x)
         x += g*mu
+
+        print("IT = " + str(k))
 
         # for visualization of the result
         S, Im_t, _ = fun(x)
@@ -155,3 +151,19 @@ def intensity_based_registration(I, Im, Affine = True, MI = True):
         learning_curve.set_ydata(similarity)
 
         display(fig)
+
+    time_elapsed = (time.clock() - start_time)
+
+    if Affine:
+        if MI:
+            print("MI = " + str(similarity[-1]) + " for the affine intensity-based registration after " + str(num_iter) + " iterations with a computation time of " + str(time_elapsed))
+        else:
+            print("CC = " + str(similarity[-1]) + " for the affine intensity-based registration after " + str(num_iter) + " iterations with a computation time of " + str(time_elapsed))
+    else:
+        if MI:
+            print("MI = " + str(similarity[-1]) + " for the rigid intensity-based registration after " + str(num_iter) + " iterations with a computation time of " + str(time_elapsed))
+        else:
+            print("CC = " + str(similarity[-1]) + " for the rigid intensity-based registration after " + str(num_iter) + " iterations with a computation time of " + str(time_elapsed))
+
+
+    return similarity[-1], time_elapsed

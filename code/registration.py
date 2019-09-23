@@ -238,16 +238,7 @@ def mutual_information(p):
     p_J = np.sum(p, axis=0)
     p_J = p_J.reshape(1, -1)
 
-    n = len(p_I)
-    MI = 0
-
-    # double summation for each coordinate in MI(I,J)
-    for i in range(n):
-        for j in range(n):
-            MI = MI + p[i, j]*np.log(p[i, j]/(p_I[i, 0]*p_J[0, j]))
-
-    # Another way I think this can be written down is:
-    # MI = sum(p.*math.log10(p./(p_I.*p_J)))
+    MI = np.sum(p*np.log(p/(p_I.dot(p_J))))
 
     return MI
 
@@ -303,6 +294,12 @@ def ngradient(fun, x, h=1e-3):
     else:
         g = np.zeros(len(x))
         for k in range(len(x)):
+
+            # ---------------------------------------------------------------------------------------------------- #
+            # this for loop is used 7 times, and fun is hence used 14 times, maybe this can be reduced to 1 time?
+            # this will reduce the computation time from ~2600 to ~185 seconds.
+            # ---------------------------------------------------------------------------------------------------- #
+
             xp = x.copy()
             xn = x.copy()
             value = x[k]

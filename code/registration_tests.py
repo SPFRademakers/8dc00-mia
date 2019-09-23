@@ -201,7 +201,7 @@ def correlation_test():
     assert abs(C1 - 1) < 10e-10, "Correlation function is incorrectly implemented (self correlation test)"
 
     C2 = reg.correlation(I, -I)
-    print(C2)
+
     print('Test successful!')
 
 
