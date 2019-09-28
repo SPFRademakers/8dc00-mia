@@ -6,6 +6,7 @@ import numpy as np
 from scipy import ndimage
 import registration_util as util
 import math
+import time
 
 
 # SECTION 1. Geometrical transformations
@@ -164,8 +165,8 @@ def correlation(I, J):
     if I.shape != J.shape:
         raise AssertionError("The inputs must be the same size.")
 
-    u = I.reshape((I.shape[0]*I.shape[1],1))
-    v = J.reshape((J.shape[0]*J.shape[1],1))
+    u = I.reshape((I.shape[0]*I.shape[1], 1))
+    v = J.reshape((J.shape[0]*J.shape[1], 1))
 
     # subtract the mean
     u = u - u.mean(keepdims=True)
@@ -213,7 +214,7 @@ def joint_histogram(I, J, num_bins=16, minmax_range=None):
     for k in range(n):
         p[I[k], J[k]] = p[I[k], J[k]] + 1
 
-    p[I, J] = p[I, J]/len(I)
+    p = p/n
 
     return p
 
@@ -240,7 +241,13 @@ def mutual_information(p):
 
     MI = np.sum(p*np.log(p/(p_I.dot(p_J))))
 
-    return MI
+    # this will normalize MI
+    U_I = -np.sum(p_I*np.log(p_I))
+    U_J = -np.sum(p_J*np.log(p_J))
+
+    NMI = MI/min(U_I, U_J)
+
+    return NMI
 
 
 def mutual_information_e(p):
@@ -288,24 +295,13 @@ def ngradient(fun, x, h=1e-3):
     # Output:
     # g - vector of partial derivatives (gradient) of fun
 
-    g = []
-    if len(x) == 1:
-        g = (fun(x+h/2)-fun(x-h/2))/h
-    else:
-        g = np.zeros(len(x))
-        for k in range(len(x)):
-
-            # ---------------------------------------------------------------------------------------------------- #
-            # this for loop is used 7 times, and fun is hence used 14 times, maybe this can be reduced to 1 time?
-            # this will reduce the computation time from ~2600 to ~185 seconds.
-            # ---------------------------------------------------------------------------------------------------- #
-
-            xp = x.copy()
-            xn = x.copy()
-            value = x[k]
-            xp[k] = value + h/2
-            xn[k] = value - h/2
-            g[k] = (fun(xp)[0]-fun(xn)[0])/h
+    I = np.identity(len(x))
+    X = np.tile(x, (len(x), 1))
+    Mp = X+(h/2)*I
+    Mn = X-(h/2)*I
+    g = np.zeros(len(x))
+    for k in range(len(x)):
+        g[k] = (fun(Mp[k])[0]-fun(Mn[k])[0])/h
 
     return g
 
