@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
+
 def ngradient(fun, x, h=1e-3):
     # Computes the derivative of a function with numerical differentiation.
     # Input:
@@ -15,35 +16,56 @@ def ngradient(fun, x, h=1e-3):
     # Output:
     # g - vector of partial derivatives (gradient) of fun
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the  computation of the partial derivatives of
-    # the function at x with numerical differentiation.
-    # g[k] should store the partial derivative w.r.t. the k-th parameter
-    #------------------------------------------------------------------#
+    g = np.zeros(len(x))
+    for k in range(len(x)):
+        xp = x.copy()
+        xn = x.copy()
+        xp[k] = xp[k] + h/2
+        xn[k] = xn[k] - h/2
+        g[k] = (fun(xp)-fun(xn))/h
 
     return g
 
-def scatter_data(X, Y, feature0=0, feature1=1, ax=None):
-    # scater_data displays a scatterplot of at most 1000 samples from dataset X, and gives each point
-    # a different color based on its label in Y
 
+def scatter_data(X, Y, feature0=0, feature1=1, ax=None):
+    # scatter_data displays a scatter-plot of at most 1000 samples from dataset X, and gives each point
+    # a different color based on its label in Y.
+    # Input:
+    # X             - samples of image
+    # Y             - labels
+    # feature0      - first feature, normally 0
+    # feature1      - second feature, normally 1
+    # ax            - ?
+    # Output:
+    # ax            - scatter-plot data, in samples and features
+
+    # visualization can only go up to 1000 pixels
     k = 1000
     if len(X) > k:
         idx = np.random.randint(len(X), size=k)
-        X = X[idx,:]
+        X = X[idx, :]
         Y = Y[idx]
 
+    # showing all labels and indices of the samples
     class_labels, indices1, indices2 = np.unique(Y, return_index=True, return_inverse=True)
+
+    # choosing to plot or not
     if ax is None:
         fig = plt.figure(figsize=(8,8))
         ax = fig.add_subplot(111)
         ax.grid()
 
+    # an amount of colors are chosen for the labels
     colors = cm.rainbow(np.linspace(0, 1, len(class_labels)))
+
+    # plotting the scatter of all samples X, with an added color and label from Y
     for i, c in zip(np.arange(len(class_labels)), colors):
         idx2 = indices2 == class_labels[i]
-        lbl = 'X, class '+str(i)
-        ax.scatter(X[idx2,feature0], X[idx2,feature1], color=c, label=lbl)
+        lbl = 'X, class ' + str(i)
+        ax.scatter(X[idx2, feature0], X[idx2, feature1], color=c, label=lbl)
+        plt.xlabel('feature0')
+        plt.ylabel('feature1')
+        ax.legend()
 
     return ax
 
@@ -59,10 +81,10 @@ def create_dataset(image_number, slice_number, task):
     # Y           - Nx1 vector with labels
     # feature_labels - kx1 cell array with descriptions of the k features
 
-    #Extract features from the subject/slice
+    # extract features from the subject/slice
     X, feature_labels = extract_features(image_number, slice_number)
 
-    #Create labels
+    # create labels
     Y = create_labels(image_number, slice_number, task)
 
     return X, Y, feature_labels
@@ -222,10 +244,8 @@ def classification_error(true_labels, predicted_labels):
 
     t = true_labels.flatten()
     p = predicted_labels.flatten()
+    err = t - p
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the missing functionality for classification error
-    #------------------------------------------------------------------#
     return err
 
 

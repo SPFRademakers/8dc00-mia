@@ -20,26 +20,37 @@ plt.rcParams['image.cmap'] = 'gray'
 # SECTION 1. Segmentation in feature space
 
 def scatter_data_test(showFigs=True):
+    # Import of the image, being flattened to a vector
     I = plt.imread('../data/dataset_brains/1_1_t1.tif')
     X1 = I.flatten().T
     X1 = X1.reshape(-1, 1)
-    GT = plt.imread('../data/dataset_brains/1_1_gt.tif')
-    gt_mask = GT>0
-    Y = gt_mask.flatten() # labels
 
+    # Import of the ground truth, being flattened to a vector
+    GT = plt.imread('../data/dataset_brains/1_1_gt.tif')
+    gt_mask = GT > 0
+    Y = gt_mask.flatten()  # labels
+
+    # Producing blurred image
     I_blurred = ndimage.gaussian_filter(I, sigma=2)
     X2 = I_blurred.flatten().T
     X2 = X2.reshape(-1, 1)
 
+    # combining image and blurred image
     X_data = np.concatenate((X1, X2), axis=1)
-    features = ('T1 intensity', 'T1 gauss 2') # Keep track of features you added
-    if showFigs:
-        util.scatter_data(X_data,Y,0,1)
+    features = ('T1 intensity', 'T1 gauss 2')  # Keep track of features you added
 
-    #------------------------------------------------------------------#
-    # TODO: Implement a few test cases of with different features
-    #------------------------------------------------------------------#
-    return X_data, Y
+    #############################################################################
+    I_blurred = ndimage.gaussian_filter(I, sigma=5)
+    X3 = I_blurred.flatten().T
+    X3 = X3.reshape(-1, 1)
+    X_data2 = np.concatenate((X1, X3), axis=1)
+    features = ('T1 intensity', 'T1 gauss 4')
+    #############################################################################
+
+    if showFigs:
+        util.scatter_data(X_data2, Y, 0, 1)
+
+    return X1, Y
 
 
 def scatter_t2_test(showFigs=True):
@@ -52,31 +63,33 @@ def scatter_t2_test(showFigs=True):
     X2 = X2.reshape(-1, 1)
 
     GT = plt.imread('../data/dataset_brains/1_1_gt.tif')
-    gt_mask = GT>0
-    Y = gt_mask.flatten() # labels
+    gt_mask = GT > 0
+    Y = gt_mask.flatten()  # labels
 
-    I1_blurred = ndimage.gaussian_filter(I1, sigma=4)
+    I1_blurred = ndimage.gaussian_filter(I2, sigma=4)
     X12 = I1_blurred.flatten().T
     X12 = X12.reshape(-1, 1)
 
-    X_data = np.concatenate((X1, X12), axis=1)
-    features = ('T1 intensity', 'T1 gauss 2') # Keep track of features you added
+    X_data = np.concatenate((X2, X12), axis=1)
+    features = ('T2 intensity', 'T2 gauss 2')  # Keep track of features you added
     if showFigs:
-        util.scatter_data(X_data,Y,0,1)
+        util.scatter_data(X_data, Y, 0, 1)
 
-    #------------------------------------------------------------------#
-    # TODO: Extract features from the T2 image and compare them to the T1 features
-    #------------------------------------------------------------------#
+    X2_data = np.concatenate((X2, X1), axis=1)
+    features = ('T2 intensity', 'T1 intensity')
+    if showFigs:
+        util.scatter_data(X2_data, Y, 0, 1)
+
     return X_data, Y
 
 
 def extract_coordinate_feature_test():
     I = plt.imread('../data/dataset_brains/1_1_t1.tif')
     c, coord_im = seg.extract_coordinate_feature(I)
-    fig = plt.figure(figsize=(10,10))
-    ax1  = fig.add_subplot(121)
+    fig = plt.figure(figsize=(10, 10))
+    ax1 = fig.add_subplot(121)
     ax1.imshow(I)
-    ax2  = fig.add_subplot(122)
+    ax2 = fig.add_subplot(122)
     ax2.imshow(coord_im)
 
 
@@ -85,9 +98,11 @@ def feature_stats_test():
     I = plt.imread('../data/dataset_brains/1_1_t1.tif')
     c, coord_im = seg.extract_coordinate_feature(I)
     X_data = np.concatenate((X, c), axis=1)
-    #------------------------------------------------------------------#
-    # TODO: Write code to examine the mean and standard deviation of your dataset containing variety of features
-    #------------------------------------------------------------------#
+
+    mn = np.mean(X_data, axis=0)
+    sd = np.std(X_data, axis=0)
+
+    return mn, sd
 
 
 def normalized_stats_test():
@@ -95,103 +110,105 @@ def normalized_stats_test():
     I = plt.imread('../data/dataset_brains/1_1_t1.tif')
     c, coord_im = seg.extract_coordinate_feature(I)
     X_data = np.concatenate((X, c), axis=1)
-    #------------------------------------------------------------------#
-    # TODO: Write code to normalize your dataset containing variety of features,
-    #  then examine the mean and std dev
-    #------------------------------------------------------------------#
+
+    X_norm, _ = seg.normalize_data(X_data)
+    mn = np.mean(X_norm, axis=0)
+    sd = np.std(X_norm, axis=0)
+
+    return mn, sd
 
 
 def distance_test():
-    #------------------------------------------------------------------#
-    # TODO: Generate a Gaussian dataset, with 100 samples per class, and compute the distances.
-    #  Use plt.imshow() to visualize the distance matrix as an image.
-    #------------------------------------------------------------------#
+    X, Y = seg.generate_gaussian_data()
+    D = scipy.spatial.distance.cdist(X, X, metric='euclidean')
+    plt.imshow(D)
     pass
+
 
 def small_samples_distance_test():
-    #------------------------------------------------------------------#
-    # TODO: Generate a small sample Gaussian dataset X,
-    #  create dataset C as per the instructions,
-    #  and calculate and plot the distances between the datasets.
-    #------------------------------------------------------------------#
-    pass
+    X, Y = seg.generate_gaussian_data(N=2)
+    C = np.array([[0, 0], [1, 1]])
+    D = scipy.spatial.distance.cdist(X, C, metric='euclidean')
+    return X, Y, C, D
+
 
 def minimum_distance_test(X, Y, C, D):
-    #------------------------------------------------------------------#
-    # TODO: plot the datasets on top of each other in different colors and visualize the data,
-    #  calculate the distances between the datasets,
-    #  order the distances (min to max) using the provided code,
-    #  calculate how many samples are closest to each of the samples in `C`
-    #------------------------------------------------------------------#
-    pass
+
+    plt.plot(X[:, 0], X[:, 1], 'ok')
+    plt.plot(C, 'or')
+    min_index = np.argmin(D, axis=1)
+    min_dist = D[np.arange(D.shape[0]), min_index]
+    return min_index, min_dist
 
 
 def distance_classification_test():
-    #------------------------------------------------------------------#
-    # TODO: Use the provided code to generate training and testing data
-    #  Classify the points in test_data, based on their distances d to the points in train_data
-    #------------------------------------------------------------------#
-    pass
+
+    train_data, train_labels = seg.generate_gaussian_data(2)
+    test_data, test_labels = seg.generate_gaussian_data(1)
+
+    D = scipy.spatial.distance.cdist(test_data, train_data, metric='euclidean')
+    min_index = np.argmin(D, axis=1)
+    min_dist = D[np.arange(D.shape[0]), min_index]
+
+    return min_index, min_dist
+
 
 def funX(X):
-    return lambda w: seg.cost_kmeans(X,w)
+    return lambda w: seg.cost_kmeans(X, w)
 
 
 def kmeans_demo():
 
-    ## Define some data and parameters
+    # define some data and parameters
     n = 100
     X1 = np.random.randn(n, 2)
     X2 = np.random.randn(n, 2)+5
     X = np.concatenate((X1, X2), axis=0)
-    Y = np.concatenate((np.zeros((n,1)), np.ones((n,1))), axis=0)
-#     ax1 = util.scatter_data(X,Y,0,1)
+    Y = np.concatenate((np.zeros((n, 1)), np.ones((n, 1))), axis=0)
+    # ax1 = util.scatter_data(X,Y,0,1)
     N, M = X.shape
 
-    #Define number of clusters we want
-    clusters = 2;
+    # define number of clusters we want
+    clusters = 2
 
     # the learning rate
-    mu = 1;
+    mu = 0.001
 
     # iterations
-    num_iter = 100
+    num_iter = 1
 
-    # Cost function used by k-Means
-    # fun = lambda w: seg.cost_kmeans(X,w)
-    fun = funX(X)
+    # cost function used by k-Means
+    fun = lambda w: seg.cost_kmeans(X, w)
+    # fun = funX(X) if another fun is requested
 
-    ## Algorithm
-    #Initialize cluster centers
+    # algorithm:
+    # initialize cluster centers
     idx = np.random.randint(N, size=clusters)
-    initial_w = X[idx,:]
+    initial_w = X[idx, :]
     w_draw = initial_w
-    print(w_draw)
 
-    #Reshape into vector (needed by ngradient)
+    # reshape into vector (needed by ngradient)
     w_vector = initial_w.reshape(clusters*M, 1)
 
-    #Vector to store cost
+    # vector to store cost
     xx = np.linspace(1, num_iter, num_iter)
-    kmeans_cost = np.empty(*xx.shape)
+    kmeans_cost = np.empty(xx.shape)  # line was kmeans_cost = np.empty(*xx.shape)
     kmeans_cost[:] = np.nan
 
-    fig = plt.figure(figsize=(14,6))
-    ax1  = fig.add_subplot(121)
-    im1  = ax1.scatter(X[:n,0], X[:n,1], label='X-class0')
-    im2  = ax1.scatter(X[n:,0], X[n:,1], label='X-class1')
-    line1, = ax1.plot(w_draw[:,0], w_draw[:,1], "or", markersize=5, label='W-vector')
+    fig = plt.figure(figsize=(14, 6))
+    ax1 = fig.add_subplot(121)
+    im1 = ax1.scatter(X[:n, 0], X[:n, 1], label='X-class0')
+    im2 = ax1.scatter(X[n:, 0], X[n:, 1], label='X-class1')
+    line1, = ax1.plot(w_draw[:, 0], w_draw[:, 1], "or", markersize=5, label='W-vector')
     # im3  = ax1.scatter(w_draw[:,0], w_draw[:,1])
     ax1.grid()
-
-    ax2  = fig.add_subplot(122, xlim=(0, num_iter), ylim=(0, 10))
+    ax2 = fig.add_subplot(122, xlim=(0, num_iter), ylim=(0, 10))
 
     text_str = 'k={}, g={:.2f}\ncost={:.2f}'.format(0, 0, 0)
 
-    txt2 = ax2.text(0.3, 0.95, text_str, bbox={'facecolor': 'green', 'alpha': 0.4, 'pad': 10},
-             transform=ax2.transAxes)
+    txt2 = ax2.text(0.3, 0.95, text_str, bbox={'facecolor': 'green', 'alpha': 0.4, 'pad': 10}, transform=ax2.transAxes)
 
-#     xx = xx.reshape(1,-1)
+    # xx = xx.reshape(1,-1)
     line2, = ax2.plot(xx, kmeans_cost, lw=2)
     ax2.set_xlabel('Iteration')
     ax2.set_ylabel('Cost')
@@ -200,37 +217,114 @@ def kmeans_demo():
     for k in np.arange(num_iter):
 
         # gradient ascent
-        g = util.ngradient(fun,w_vector)
-        w_vector = w_vector - mu*g
+        g = util.ngradient(fun, w_vector)   # g comes out way too large
+        change = mu*g
+        w_vector = w_vector - change[:, np.newaxis]
+
         # calculate cost for plotting
         kmeans_cost[k] = fun(w_vector)
         text_str = 'k={}, cost={:.2f}'.format(k, kmeans_cost[k])
         txt2.set_text(text_str)
+
         # plot
-        line2.set_ydata(kmeans_cost)
-        w_draw_new = w_vector.reshape(clusters, M)
-        line1.set_data(w_draw_new[:,0], w_draw_new[:,1])
-        display(fig)
-        clear_output(wait = True)
-        plt.pause(.005)
+        # line2.set_ydata(kmeans_cost)
+        # w_draw_new = w_vector.reshape(clusters, M)
+        # line1.set_data(w_draw_new[:, 0], w_draw_new[:, 1])
+        # display(fig)
+        # clear_output(wait=True)
+        # plt.pause(.005)
 
     return kmeans_cost
 
 
 def kmeans_clustering_test():
-    #------------------------------------------------------------------#
-    #TODO: Store errors for training data
-    #------------------------------------------------------------------#
-    pass
+
+    # define the normalized image and gt
+    I = plt.imread('../data/dataset_brains/1_1_t1.tif')
+    X = I.flatten().T
+    X = X.reshape(-1, 1)  # reshapes the figure into a vector
+    GT = plt.imread('../data/dataset_brains/1_1_gt.tif')
+    gt_mask = GT > 0
+    Y = gt_mask.flatten()  # reshapes the binary gt to a vector
+
+    c, _ = seg.extract_coordinate_feature(I)  # producing a vector with all coordinates
+    X_data = np.concatenate((X, c), axis=1)  # extends each row with the respective coordinate of the pixel
+    X_norm, _ = seg.normalize_data(X_data)
+    N, M = X_norm.shape
+
+    n = 100
+
+    # define number of clusters we want
+    clusters = 2
+
+    # the learning rate
+    mu = 0.00001
+
+    # iterations
+    num_iter = 100
+
+    # cost function used by k-Means
+    fun = lambda w: seg.cost_kmeans(X_norm, w)
+
+    # algorithm:
+    # initialize cluster centers
+    idx = np.random.randint(N, size=clusters)
+    initial_w = X_norm[idx, :]
+    w_draw = initial_w
+
+    # reshape into vector (needed by ngradient)
+    w_vector = initial_w.reshape(clusters*M, 1)
+
+    # vector to store cost
+    xx = np.linspace(1, num_iter, num_iter)
+    kmeans_cost = np.empty(*xx.shape)  # line was kmeans_cost = np.empty(*xx.shape)
+    kmeans_cost[:] = np.nan
+
+    fig = plt.figure(figsize=(14, 6))
+    ax = fig.add_subplot(121)
+    util.scatter_data(X_norm, Y, ax=ax)
+    line1, = ax.plot(w_draw[:, 0], w_draw[:, 1], "ok", markersize=5, label='W-vector')
+    ax.grid()
+    ax2 = fig.add_subplot(122, xlim=(0, num_iter), ylim=(0, 10))
+
+    text_str = 'k={}, g={:.2f}\ncost={:.2f}'.format(0, 0, 0)
+
+    txt2 = ax2.text(0.3, 0.95, text_str, bbox={'facecolor': 'green', 'alpha': 0.4, 'pad': 10}, transform=ax2.transAxes)
+
+    line2, = ax2.plot(xx, kmeans_cost, lw=2)
+    ax2.set_xlabel('Iteration')
+    ax2.set_ylabel('Cost')
+    ax2.grid()
+
+    for k in np.arange(num_iter):
+
+        # gradient ascent
+        g = util.ngradient(fun, w_vector)
+        change = mu * g
+        w_vector = w_vector - change[:, np.newaxis]
+
+        # calculate cost for plotting
+        kmeans_cost[k] = fun(w_vector)
+        text_str = 'k={}, cost={:.2f}'.format(k, kmeans_cost[k])
+        txt2.set_text(text_str)
+
+        # plot
+        line2.set_ydata(kmeans_cost)
+        w_draw_new = w_vector.reshape(clusters, M)
+        line1.set_data(w_draw_new[:, 0], w_draw_new[:, 1])
+        display(fig)
+        clear_output(wait=True)
+        plt.pause(.005)
+
+    # return kmeans_cost
+
 
 def nn_classifier_test_samples():
 
     train_data, train_labels = seg.generate_gaussian_data(2)
     test_data, test_labels = seg.generate_gaussian_data(1)
-    predicted_labels = seg.nn_classifier(train_data, train_labels, test_data)
+    predicted_labels, _ = seg.nn_classifier(train_data, train_labels, test_data)
 
-    # predicted_labels = predicted_labels.astype(bool)
-    # test_labels = test_labels.astype(bool)
     err = util.classification_error(test_labels, predicted_labels)
 
     print('True labels:\n{}'.format(test_labels))
@@ -249,17 +343,17 @@ def generate_train_test(N, task):
     # task          - String, either 'easy' or 'hard'
 
     if task == 'easy':
-        #-------------------------------------------------------------------#
-        #TODO: modify these values to create an easy train/test dataset pair
-        #-------------------------------------------------------------------#
-        pass
+        mu1 = [0, 0]
+        mu2 = [0, 2]
+        sigma1 = [[1, 0], [0, 1]]
+        sigma2 = [[1, 0], [0, 1]]
 
 
     if task == 'hard':
-        #-------------------------------------------------------------------#
-        #TODO: modify these values to create an difficult train/test dataset pair
-        #-------------------------------------------------------------------#
-        pass
+        mu1 =
+        mu2 =
+        sigma1 =
+        sigma2 =
 
     trainX, trainY = seg.generate_gaussian_data(N, mu1, mu2, sigma1, sigma2)
     testX, testY = seg.generate_gaussian_data(N, mu1, mu2, sigma1, sigma2)
@@ -273,6 +367,7 @@ def easy_hard_data_classifier_test():
     # calculate classification error in each case
     #-------------------------------------------------------------------#
     pass
+
 
 def nn_classifier_test_brains(testDice=False):
 
@@ -569,11 +664,13 @@ def eigen_vecval_test(sigma):
     #------------------------------------------------------------------#
     pass
 
+
 def rotate_using_eigenvectors_test(X, Y, v):
     #------------------------------------------------------------------#
     # TODO: Rotate X using the eigenvectors
     #------------------------------------------------------------------#
     pass
+
 
 def test_mypca():
 

@@ -19,10 +19,6 @@ def intensity_based_registration_demo():
     # we start with the identity transformation
     # most likely you will not have to change these
 
-    #---------------------------------------------------------------------#
-    #x = np.array([0., 0., 0.])
-    #---------------------------------------------------------------------#
-
     x = np.array([0., 1., 1., 0., 0., 0., 0.])
 
     # NOTE: for affine registration you have to initialize
@@ -34,10 +30,6 @@ def intensity_based_registration_demo():
     # in which the first two input parameters (fixed and moving image)
     # are fixed and the only remaining parameter is the vector x with the
     # parameters of the transformation
-
-    #---------------------------------------------------------------------#
-    #fun = lambda x: reg.rigid_corr(I, Im, x)
-    #---------------------------------------------------------------------#
 
     fun = lambda x: reg.affine_corr(I, Im, x)
 

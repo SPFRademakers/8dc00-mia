@@ -6,35 +6,39 @@ Segmentation module code for 8DC00 course
 
 import numpy as np
 import scipy
+import segmentation_util as util
 from sklearn.neighbors import KNeighborsClassifier
 
 
 # SECTION 1. Segmentation in feature space
 
-def generate_gaussian_data(N=100, mu1=[0,0], mu2=[2,0], sigma1=[[1,0],[0,1]], sigma2=[[1,0],[0,1]]):
+def generate_gaussian_data(N=100, mu1=[0, 0], mu2=[2, 0], sigma1=[[1, 0], [0, 1]], sigma2=[[1, 0], [0, 1]]):
     # Generates a 2D toy dataset with 2 classes, N samples per class. 
     # Class 1 is Gaussian distributed with mu1 and sigma2
     # Class 2 is Gaussian distributed with mu2 and sigma2. 
-    # By default, N=100, mu1=[0 0], mu2=[2,0], sigma1=sigma2 = [1 0; 0 1]
+    # By default, N = 100, mu1 = [0 0], mu2 = [2, 0], sigma1 = sigma2 = [1 0; 0 1]
     #
     # Input:
     # N             - Number of samples per class (2N in total)
     # mu1           - 1x2 vector, mean of class 1 
     # mu2           - 1x2 vector, mean of class 2 
     # sigma1        - 2x2 matrix, covariance of class 1 
-    # sigma2        - 2x2 matrix, covariance of class 2 
+    # sigma2        - 2x2 matrix, covariance of class 2
+    # Output:
+    # X             - NxN matrix, samples and features
+    # Y             - Nx1 vector, labels
     
     # Generate class 1
     A = np.linalg.cholesky(sigma1)
-    data1 = np.random.randn(N,2).dot(A) + mu1     #Rotate data according to covariance matrix (must be positive definite!), and add the mean
+    data1 = np.random.randn(N, 2).dot(A) + mu1     # Rotate data according to covariance matrix (must be positive definite!), and add the mean
     # Generate class 2
     B = np.linalg.cholesky(sigma2)
-    data2 = np.random.randn(N,2).dot(B) + mu2
+    data2 = np.random.randn(N, 2).dot(B) + mu2
     
     # Put the data together
     X = np.concatenate((data1, data2), axis=0)
     # Create labels
-    Y = np.concatenate((np.zeros((N,1)), np.ones((N,1))), axis=0)
+    Y = np.concatenate((np.zeros((N, 1)), np.ones((N, 1))), axis=0)
 
     return X, Y
 
@@ -51,21 +55,20 @@ def extract_coordinate_feature(im):
     n_rows, n_cols = im.shape   
     
     # Find image center
-    x_center = np.floor(n_rows/2);
-    y_center = np.floor(n_cols/2);
+    x_center = np.floor(n_rows/2)
+    y_center = np.floor(n_cols/2)
     
     # Generate coordinate images
-    ar = np.arange(n_cols).reshape(1,-1)
+    ar = np.arange(n_cols).reshape(1, -1)
     x_coord = np.tile(ar, (n_rows, 1))
     ar = ar.T
     y_coord = np.tile(ar, (1, n_cols))
-    
-    #------------------------------------------------------------------#
-    # TODO: Use the above variables to create an image coord_im
-    # that combines the information from x_coord and y_coord 
-    #------------------------------------------------------------------#
-    
-    # Create a feature from the coordinate image
+
+    coord_im = np.zeros((n_cols, n_rows))
+    for x in range(n_cols):
+        for y in range(n_rows):
+            coord_im[x, y] = np.sqrt((x-x_center)**2 + (y-y_center)**2)
+
     c = coord_im.flatten().T
     c = c.reshape(-1, 1)
 
@@ -78,15 +81,18 @@ def normalize_data(train_data, test_data=None):
     # train_data.
     #
     # Input:
-    # train_data            num_train x k dataset with Ntrain samples and k features
-    # test_data            (Optional input) num_test x k dataset with Ntest samples and k features 
+    # train_data   num_train x k dataset with Ntrain samples and k features
+    # test_data    (Optional input) num_test x k dataset with Ntest samples and k features
     # Output:
-    # train_data            num_train x k dataset with Ntrain samples and k features, that has been normalized by trainX
-    # test_data            (Optional output) num_test x k dataset with Ntest samples and k features, that has been normalized by trainX 
+    # train_data   num_train x k dataset with Ntrain samples and k features, that has been normalized by trainX
+    # test_data    (Optional output) num_test x k dataset with Ntest samples and k features, that's normalized by trainX
     
-    #Find mean and standard deviation of trainX
-    mean_train = np.mean(train_data,axis=0)
-    std_train = np.std(train_data,axis=0)
+    # find mean and standard deviation of trainX
+    mean_train = np.mean(train_data, axis=0)
+    std_train = np.std(train_data, axis=0)
+
+    # to make division possible, add small number to places with value 0.
+    std_train[std_train == 0] = 1e-3
 
     # Subtract mean
     train_data = train_data - mean_train
@@ -95,7 +101,7 @@ def normalize_data(train_data, test_data=None):
     train_data = train_data / std_train
 
     # (Optional) If testX needs to be normalized also - note it is normalized by
-    #the mean and variance of trainX, not testX! 
+    # the mean and variance of trainX, not testX!
     if test_data is not None:
         test_data = test_data - mean_train
         test_data = test_data / std_train
@@ -104,22 +110,28 @@ def normalize_data(train_data, test_data=None):
 
 
 def cost_kmeans(X, w_vector):
-    # Computes the cost of assigning data in X to clusters in w_vector 
-    
+    # Computes the cost of assigning data in X to clusters in w_vector
+    # Input:
+    # X         - data
+    # w_vector  - means of clusters
+    # Output:
+    # J         - cost
+
     # Get the data dimensions
     n, m = X.shape
 
-    # Number of clusters
+    # Number of clusters per feature
     K = int(len(w_vector)/m)
 
     # Reshape cluster centers into dataset format
     W = w_vector.reshape(K, m)
 
-    #------------------------------------------------------------------#
-    # TODO: Find distance of each point to each cluster center
-    # Then find the minimum distances min_dist and indices min_index
-    # Then calculate the cost
-    #------------------------------------------------------------------#
+    D = scipy.spatial.distance.cdist(X, W, metric='euclidean')
+    min_index = np.argmin(D, axis=1)
+    min_dist = D[np.arange(D.shape[0]), min_index]
+
+    J = np.sum(min_dist**2)
+
     return J
 
 
@@ -133,9 +145,10 @@ def kmeans_clustering(test_data, K=2):
     # Output:
     # predicted_labels    num_test x 1 predicted vector with labels for the test data
 
-    # Link to the cost function of kMeans
-    fun = lambda w: cost_kmeans(test_data, w)
+    N, M = test_data.shape
 
+    # link to the cost function of kMeans
+    fun = lambda w: cost_kmeans(test_data, w)
 
     # the learning rate
     mu = 0.01
@@ -143,27 +156,26 @@ def kmeans_clustering(test_data, K=2):
     # iterations
     num_iter = 100
 
-    #------------------------------------------------------------------#
-    # TODO: Initialize cluster centers and store them in w_initial
-    #------------------------------------------------------------------#
+    # Initialize cluster centers and store them in w_initial
+    w_initial, _ = generate_gaussian_data(2)
 
-    #Reshape centers to a vector (needed by ngradient)
-    w_vector = w_initial.reshape(K*M, 1)
+    # Reshape centers to a vector (needed by ngradient)
+    w_vector = w_initial.reshape(K*M, 1)   # TODO: WHERE THE FUCK DOES M COME FROM?
 
     for i in np.arange(num_iter):
         # gradient ascent
-        w_vector = w_vector - mu*reg.ngradient(fun,w_vector)
+        w_vector = w_vector - mu*util.ngradient(fun, w_vector)
 
-    #Reshape back to dataset
+    # Reshape back to dataset
     w_final = w_vector.reshape(K, M)
 
-    #------------------------------------------------------------------#
-    # TODO: Find distance of each point to each cluster center
-    # Then find the minimum distances min_dist and indices min_index
-    #------------------------------------------------------------------#
+    # Find min_dist and min_index
+    D = scipy.spatial.distance.cdist(test_data, w_final, metric='euclidean')
+    min_index = np.argmin(D, axis=1)
+    min_dist = np.diagonal(D[:, min_index])
 
     # Sort by intensity of cluster center
-    sorted_order = np.argsort(w_final[:,0], axis=0)
+    sorted_order = np.argsort(w_final[:, 0], axis=0)
 
     # Update the cluster indices based on the sorted order and return results in
     # predicted_labels
@@ -171,7 +183,7 @@ def kmeans_clustering(test_data, K=2):
     predicted_labels[:] = np.nan
 
     for i in np.arange(len(sorted_order)):
-        predicted_labels[min_index==sorted_order[i]] = i
+        predicted_labels[min_index == sorted_order[i]] = i
 
     return predicted_labels
 
@@ -186,19 +198,24 @@ def nn_classifier(train_data, train_labels, test_data):
     # test_labels       num_test x p matrix with features for the test data
     #
     # Output:
-    # predicted_labels   num_test x 1 predicted vector with labels for the test data
+    # predicted_labels  num_test x 1 predicted vector with labels for the test data
 
-    #------------------------------------------------------------------#
-    # TODO: Implement missing functionality
-    #------------------------------------------------------------------#
+    D = scipy.spatial.distance.cdist(test_data, train_data, metric='euclidean')
+    print(D)
+    predicted_labels = np.argmin(D, axis=1)
+    min_dist = D[np.arange(D.shape[0]), predicted_labels]
 
-    #Return fraction of variance
-    fraction_variance = np.zeros((X_pca.shape[1],1))
-    for i in np.arange(X_pca.shape[1]):
-        fraction_variance[i] = np.sum(w[:i+1])/np.sum(w)
+    # v = ...
+    # w = ...
+    # X_pca = ...
 
-    return X_pca, v, w, fraction_variance
+    # return fraction of variance
+    # fraction_variance = np.zeros((X_pca.shape[1], 1))
+    # for i in np.arange(X_pca.shape[1]):
+    #     fraction_variance[i] = np.sum(w[:i+1])/np.sum(w)   # so, w is the variance? Why do we need variance?
 
+    # return X_pca, v, w, fraction_variance
+    return predicted_labels, min_dist
 
 # SECTION 3. Atlases and active shapes
 
