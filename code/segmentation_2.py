@@ -130,7 +130,6 @@ def cost_kmeans(X, w_vector):
     min_index = np.argmin(D, axis=1)
     min_dist = D[np.arange(D.shape[0]), min_index]
 
-
     J = np.sum(min_dist**2)
 
     return J
@@ -146,8 +145,6 @@ def kmeans_clustering(test_data, K=2):
     # Output:
     # predicted_labels    num_test x 1 predicted vector with labels for the test data
 
-    print(test_data.shape)
-
     N, M = test_data.shape
 
     # link to the cost function of kMeans
@@ -161,10 +158,9 @@ def kmeans_clustering(test_data, K=2):
 
     # Initialize cluster centers and store them in w_initial
     w_initial, _ = generate_gaussian_data(2)
-    print(w_initial.shape)
 
     # Reshape centers to a vector (needed by ngradient)
-    w_vector = w_initial.reshape(K*M, 1)
+    w_vector = w_initial.reshape(K*M, 1)   # TODO: WHERE THE FUCK DOES M COME FROM?
 
     for i in np.arange(num_iter):
         # gradient ascent
@@ -205,16 +201,18 @@ def nn_classifier(train_data, train_labels, test_data):
     # predicted_labels  num_test x 1 predicted vector with labels for the test data
 
     D = scipy.spatial.distance.cdist(test_data, train_data, metric='euclidean')
-    idx_closest_point = np.argmin(D, axis=1)
-    predicted_labels = train_labels[idx_closest_point]
-
+    print(D)
+    predicted_labels = np.argmin(D, axis=1)
+    min_dist = D[np.arange(D.shape[0]), predicted_labels]
+    # v = ...
+    # w = ...
+    # X_pca = ...
     return predicted_labels
     
 
 def knn_classifier(train_data, train_labels, test_data, k):
-
     # Returns the labels for test_data, predicted by the k-NN
-    # classifier trained on train_data and train_labels
+    # clasifier trained on train_data and train_labels
     # Input:
     # train_data - num_train x p matrix with features for the training data
     # train_labels - num_train x 1 vector with labels for the training data
@@ -225,43 +223,49 @@ def knn_classifier(train_data, train_labels, test_data, k):
     
     D = scipy.spatial.distance.cdist(test_data, train_data, metric='euclidean')
     sort_ix = np.argsort(D, axis=1)
-    sort_ix_k = sort_ix[:, :k]  # Get the k smallest distances
+    sort_ix_k = sort_ix[:,:k] # Get the k smallest distances
     predicted_labels = train_labels[sort_ix_k]
     predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
 
     return predicted_labels
 
 
+
 # SECTION 2. Generalization and overfitting
 
 
 def mypca(X):
-    # rotates the data X such that the dimensions of rotated data Xpca are uncorrelated and sorted by variance.
+    # Rotates the data X such that the dimensions of rotated data Xpca
+    # are uncorrelated and sorted by variance.
     # Input:
-    # X                 - Nxk feature matrix
+    # X - Nxk feature matrix
     # Output:
-    # X_pca             - Nxk rotated feature matrix
-    # U                 - kxk matrix of eigenvectors
-    # Lambda            - kx1 vector of eigenvalues
-    # fraction_variance - kx1 vector which stores how much variance is retained in the k components
+    # X_pca - Nxk rotated feature matrix
+    # U - kxk matrix of eigenvectors
+    # Lambda - kx1 vector of eigenvalues
+    # fraction_variance - kx1 vector which stores how much variance
+    #                     is retained in the k components
 
-    # mean normalization
     X = X - np.mean(X, axis=0)
 
-    sigma = np.cov(X.T)
-    w, v = np.linalg.eig(sigma)
-    ix = np.argsort(w)[::-1]
-    w = w[ix]
-    v = v[:, ix]
-    X_pca = (v.T.dot(X.T)).T
+    #------------------------------------------------------------------#
+    #TODO: Calculate covariance matrix of X, find eigenvalues and eigenvectors,
+    # sort them, and rotate X using the eigenvectors
 
-    # Return fraction of variance
-    fraction_variance = np.zeros((X_pca.shape[1], 1))
+    #------------------------------------------------------------------#
+
+    #Return fraction of variance
+    fraction_variance = np.zeros((X_pca.shape[1],1))
     for i in np.arange(X_pca.shape[1]):
         fraction_variance[i] = np.sum(w[:i+1])/np.sum(w)
 
-    return X_pca, v, w, fraction_variance, ix
+    # return fraction of variance
+    # fraction_variance = np.zeros((X_pca.shape[1], 1))
+    # for i in np.arange(X_pca.shape[1]):
+    #     fraction_variance[i] = np.sum(w[:i+1])/np.sum(w)   # so, w is the variance? Why do we need variance?
 
+    # return X_pca, v, w, fraction_variance
+    return predicted_labels, min_dist
 
 # SECTION 3. Atlases and active shapes
 
@@ -269,28 +273,30 @@ def segmentation_combined_atlas(train_labels_matrix, combining='mode'):
     # Segments the image defined based only on the labels/atlases of the other subjects
     #
     # Input:
-    # train_labels          num_train x num_atlases training labels vector
-    # combining             String corresponding to combining type: 'mode', 'min' (only binary), 'max' (only binary)
+    # train_labels   num_train x num_atlases training labels vector
+    # combining      String corresponding to combining type: 'mode', 'min'
+    # (only binary labels), 'max' (only binary labels)
     #
     # Output:
-    # predicted_labels      Predicted labels for the test slice
+    # predicted_labels    Predicted labels for the test slice
 
     r, c = train_labels_matrix.shape
 
     # Segment the test subject by each individual atlas
-    predicted_labels = np.empty([r, c])
+    predicted_labels = np.empty([r,c])
     predicted_labels[:] = np.nan
 
     for i in np.arange(c):
-        predicted_labels[:, i] = segmentation_atlas(None, train_labels_matrix[:, i], None)
+        predicted_labels[:,i] = segmentation_atlas(None, train_labels_matrix[:,i], None)
 
     # Combine labels
+    # Option 1: Most frequent label
     if combining == 'mode':
-        predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]    # somehow only makes True and False
-    elif combining == 'min':
-        predicted_labels = np.array([min(row) for row in predicted_labels])
-    elif combining == 'max':
-        predicted_labels = np.array([max(row) for row in predicted_labels])
+        predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
+    
+    #------------------------------------------------------------------#
+    # TODO: Add options for combining with min and max
+    #------------------------------------------------------------------#
     else:
         raise ValueError("No such combining type exists")
 
@@ -311,7 +317,7 @@ def segmentation_atlas(train_data, train_labels, test_data):
     # images are registered. But in practice, we would want to first do
     # registration on the image intensity
 
-    # Assume predicted labels are the atlas labels
+    #Assume predicted labels are the atlas labels
     predicted_labels = train_labels
 
     return predicted_labels
@@ -320,26 +326,28 @@ def segmentation_atlas(train_data, train_labels, test_data):
 def segmentation_combined_knn(train_data_matrix, train_labels_matrix, test_data, k=1):
 
     # Segments the image defined by test_data based on
-    # kNN classifiers trained on data in train_data_matrix and train_labels_matrix
+    # kNN classifiers trained on data in train_data_matrix and
+    # train_labels_matrix
     #
     # Input:
-    # train_data_matrix    num_pixels x num_features x num_subjects matrix of features
-    # train_labels_matrix  num_pixels x num_subjects matrix of labels
-    # test_data            num_pixels x num_features test data
-    # k                    number of neighbors
+    # train_data_matrix   num_pixels x num_features x num_subjects matrix of
+    # features
+    # train_labels_matrix num_pixels x num_subjects matrix of labels
+    # test_data           num_pixels x num_features test data
+    # k                   Number of neighbors
     #
     # Output:
-    # predicted_labels     predicted labels for the test slice
+    # predicted_labels    Predicted labels for the test slice
 
     r, c = train_labels_matrix.shape
 
-    predicted_labels = np.empty([r, c])
+    predicted_labels = np.empty([r,c])
     predicted_labels[:] = np.nan
 
     for i in np.arange(c):
-        predicted_labels[:, i] = segmentation_knn(train_data_matrix[:, :, i], train_labels_matrix[:, i], test_data, k)
+        predicted_labels[:,i] = segmentation_knn(train_data_matrix[:,:,i], train_labels_matrix[:,i], test_data, k)
 
-    # Combine labels
+    #Combine labels
     predicted_labels = scipy.stats.mode(predicted_labels, axis=1)[0]
 
     return predicted_labels.astype(bool)
@@ -347,7 +355,8 @@ def segmentation_combined_knn(train_data_matrix, train_labels_matrix, test_data,
 
 def segmentation_knn(train_data, train_labels, test_data, k=1):
 
-    # Segments the image using a knn classifier trained on train_data and train_labels
+    # Segments the image using a knn classsifier trained on
+    # train_data and train_labels
     #
     # Input:
     # train_data     num_train x num_features training data matrix
@@ -358,17 +367,23 @@ def segmentation_knn(train_data, train_labels, test_data, k=1):
     # Output:
     # predicted_labels    Predicted labels for the test slice
 
+    
     # Subsample training data for efficiency
-    num_samples = 3000
+    num_samples=3000
     ix = np.random.randint(train_data.shape[0], size=num_samples)
 
-    subset_train_data = train_data[ix, :]
+    subset_train_data = train_data[ix,:]
     subset_train_labels = train_labels[ix]
 
-    # Normalize
-    [train_data_norm, test_data_norm] = normalize_data(subset_train_data, test_data)
 
-    # Train and apply kNN classifier
+    #Normalize
+    [train_data_norm, test_data_norm] = normalize_data(subset_train_data, test_data);
+
+    #Train and apply kNN classifier
+
+    # Option 1: The implementation we made in this course (slower)
+    # predicted_labels = knn_classifier(train_data_norm, subset_train_labels, test_data_norm, k)
+
     # Option 2: The implementation of sklearn (faster)
     neigh = KNeighborsClassifier(n_neighbors=k)
     neigh.fit(train_data_norm, subset_train_labels)

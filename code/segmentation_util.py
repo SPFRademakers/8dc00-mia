@@ -5,6 +5,8 @@ Utility functions for segmentation.
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import segmentation as seg
+from scipy import ndimage
 
 
 def ngradient(fun, x, h=1e-3):
@@ -71,7 +73,7 @@ def scatter_data(X, Y, feature0=0, feature1=1, ax=None):
 
 
 def create_dataset(image_number, slice_number, task):
-    # create_dataset Creates a dataset for a particular subject (image), slice and task
+    # create_dataset creates a dataset for a particular subject (image), slice and task
     # Input:
     # image_number - Number of the subject (scalar)
     # slice_number - Number of the slice (scalar)
@@ -96,8 +98,8 @@ def extract_features(image_number, slice_number):
     # image_number - Which subject (scalar)
     # slice_number - Which slice (scalar)
     # Output:
-    # X           - N x k dataset, where N is the number of pixels and k is the total number of features
-    # features    - k x 1 cell array describing each of the k features
+    # X            - N x k dataset, where N is the number of pixels and k is the total number of features
+    # features     - k x 1 cell array describing each of the k features
 
     base_dir = '../data/dataset_brains/'
 
@@ -107,35 +109,65 @@ def extract_features(image_number, slice_number):
     n = t1.shape[0]
     features = ()
 
+    # addition of features T1 and T2 intensities
     t1f = t1.flatten().T.astype(float)
     t1f = t1f.reshape(-1, 1)
     t2f = t2.flatten().T.astype(float)
     t2f = t2f.reshape(-1, 1)
-
     X = np.concatenate((t1f, t2f), axis=1)
 
     features += ('T1 intensity',)
     features += ('T2 intensity',)
 
-    #------------------------------------------------------------------#
-    # TODO: Extract more features and add them to X.
-    # Don't forget to provide (short) descriptions for the features
-    #------------------------------------------------------------------#
-    return X, features
+    # addition of feature coordinates
+    c, _ = seg.extract_coordinate_feature(t1)
+    X1 = np.concatenate((X, c), axis=1)
+    features += ('coordinates',)
+
+    # addition of feature T1 gaussian blurred
+    t1_g = ndimage.gaussian_filter(t1, sigma=2)
+    t1_gf = t1_g.flatten().T.astype(float)
+    t1_gf = t1_gf.reshape(-1, 1)
+    X2 = np.concatenate((X1, t1_gf), axis=1)
+    features += ('guassian blurred (T1)',)
+
+    # addition of feature T2 gaussian blurred
+    t2_g = ndimage.gaussian_filter(t2, sigma=2)
+    t2_gf = t2_g.flatten().T.astype(float)
+    t2_gf = t2_gf.reshape(-1, 1)
+    X3 = np.concatenate((X2, t2_gf), axis=1)
+    features += ('guassian blurred (T2)',)
+
+    # addition of laplacian kernel on T1
+    k_laplace = np.array([np.array([1, 1, 1]), np.array([1, -8, 1]), np.array([1, 1, 1])])
+    Ic1 = ndimage.convolve(t1, k_laplace, mode='reflect')
+    Ic1_f = Ic1.flatten().T.astype(float)
+    Ic1_f = Ic1_f.reshape(-1, 1)
+    X4 = np.concatenate((X3, Ic1_f), axis=1)
+    features += ('laplacian kernel (T1)',)
+
+    # addition of laplacian kernel on T2
+    k_laplace = np.array([np.array([1, 1, 1]), np.array([1, -8, 1]), np.array([1, 1, 1])])
+    Ic2 = ndimage.convolve(t2, k_laplace, mode='reflect')
+    Ic2_f = Ic2.flatten().T.astype(float)
+    Ic2_f = Ic2_f.reshape(-1, 1)
+    X5 = np.concatenate((X4, Ic2_f), axis=1)
+    features += ('laplacian kernel (T2)',)
+
+    return X5, features
 
 
 def create_labels(image_number, slice_number, task):
-    # Creates labels for a particular subject (image), slice and
-    # task
-    #
+    # Creates labels for a particular subject (image), slice and task
+
     # Input:
     # image_number - Number of the subject (scalar)
     # slice_number - Number of the slice (scalar)
-    # task        - String corresponding to the task, either 'brain' or 'tissue'
-    #
+    # task         - String corresponding to the task, either 'brain' or 'tissue'
+
     # Output:
-    # Y           - Nx1 vector with labels
-    #
+    # Y            - Nx1 vector with labels
+
     # Original labels reference:
     # 0 background
     # 1 cerebellum
@@ -147,29 +179,31 @@ def create_labels(image_number, slice_number, task):
     # 7 cortical grey matter
     # 8 cerebrospinal fluid in the extracerebral space
 
-    #Read the ground-truth image
+    # Read the ground-truth image
+    global Y
     base_dir = '../data/dataset_brains/'
 
     I = plt.imread(base_dir + str(image_number) + '_' + str(slice_number) + '_gt.tif')
 
     if task == 'brain':
-        Y = I>0
-    elif task == 'brain':
-        white_matter = I == 2 | I == 5
-        gray_matter  = I == 7 | I == 3
-        csf         = I == 4 | I == 8
-        background  = I == 0 |  I == 1 | I == 6
-        Y = I
-        Y[background] = 0
-        Y[white_matter] = 1
-        Y[gray_matter] = 2
-        Y[csf] = 3
+        Y = I > 0
+    elif task == 'tissue':
+        Y = I.copy()
+        Y[I == 0] = 0
+        Y[I == 1] = 0
+        Y[I == 6] = 0
+        Y[I == 2] = 1
+        Y[I == 5] = 1
+        Y[I == 7] = 2
+        Y[I == 3] = 2
+        Y[I == 4] = 3
+        Y[I == 8] = 3
     else:
         print(task)
         raise ValueError("Variable 'task' must be one of two values: 'brain' or 'tissue'")
 
     Y = Y.flatten().T
-    Y = Y.reshape(-1,1)
+    Y = Y.reshape(-1, 1)
 
     return Y
 
@@ -181,22 +215,34 @@ def dice_overlap(true_labels, predicted_labels, smooth=1.):
     # predicted_labels    Nx1 binary vector with the predicted labels
     # smooth              smoothing factor that prevents division by zero
     # Output:
-    # dice          Dice coefficient
+    # dice                Dice coefficient
 
     assert true_labels.shape[0] == predicted_labels.shape[0], "Number of labels do not match"
 
     t = true_labels.flatten()
     p = predicted_labels.flatten()
 
-    #------------------------------------------------------------------#
-    # TODO: Implement the missing functionality for Dice overlap
-    #------------------------------------------------------------------#
+    # AB = 0
+    # A = 0
+    # B = 0
+    # for i in range(len(t)):
+    #     if t[i] == 1 and p[i] == 1:
+    #         AB = AB + 1
+    #     if t[i] == 1:
+    #         A = A + 1
+    #     if p[i] == 1:
+    #         B = B + 1
+    #
+    # dice = 2 * AB / (A + B)
+
+    dice = np.sum(p[t == 1]*2.0 / (np.sum(p) + np.sum(t)))
+
     return dice
 
 
 def dice_multiclass(true_labels, predicted_labels):
-    #dice_multiclass.m returns the Dice coefficient for two label vectors with
-    #multiple classses
+    # dice_multiclass.m returns the Dice coefficient for two label vectors with
+    # multiple classses
     #
     # Input:
     # true_labels         Nx1 vector with the true labels
@@ -219,7 +265,6 @@ def dice_multiclass(true_labels, predicted_labels):
         temp_true[true_labels != all_classes[i]] = 0  #Everything else is background
 
         temp_predicted = predicted_labels.copy();
-        print(temp_predicted.dtype)
         temp_predicted[predicted_labels == all_classes[i]] = 1
         temp_predicted[predicted_labels != all_classes[i]] = 0
         dice_score[i] = dice_overlap(temp_true.astype(int), temp_predicted.astype(int))
@@ -244,9 +289,27 @@ def classification_error(true_labels, predicted_labels):
 
     t = true_labels.flatten()
     p = predicted_labels.flatten()
-    err = t - p
 
-    return err
+    error = np.sum(t != p) / len(t)
+
+    # TP = 0
+    # FN = 0
+    # FP = 0
+    # TN = 0
+    # for i in range(len(t)):
+    #     if t[i] == 1 and p[i] == 1:
+    #         TP = TP + 1
+    #     if t[i] == 1 and p[i] == 0:
+    #         FN = FN + 1
+    #     if t[i] == 0 and p[i] == 1:
+    #         FP = FP + 1
+    #     if t[i] == 0 and p[i] == 0:
+    #         TN = TN + 1
+    #
+    # accuracy = (TP + TN) / (TP + FP + FN + TN)
+    # error = 1-accuracy
+
+    return error
 
 
 

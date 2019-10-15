@@ -51,9 +51,9 @@ def t2h(T, t):
     Tt[0][2] = t[0]
     Tt[1][2] = t[1]
     
-    n = np.zeros([1,Tt.shape[1]])
+    n = np.zeros([1, Tt.shape[1]])
     n[0][-1] = 1
-    Th = np.concatenate((Tt,n), axis=0)
+    Th = np.concatenate((Tt, n), axis=0)
 
     return Th
 

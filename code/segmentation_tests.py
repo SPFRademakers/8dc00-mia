@@ -217,7 +217,7 @@ def kmeans_demo():
     for k in np.arange(num_iter):
 
         # gradient ascent
-        g = util.ngradient(fun, w_vector)   # g comes out way too large
+        g = util.ngradient(fun, w_vector)
         change = mu*g
         w_vector = w_vector - change[:, np.newaxis]
 
@@ -239,17 +239,19 @@ def kmeans_demo():
 
 def kmeans_clustering_test():
 
-    # define the normalized image and gt
+    # define the blurred image
     I = plt.imread('../data/dataset_brains/1_1_t1.tif')
     X = I.flatten().T
-    X = X.reshape(-1, 1)  # reshapes the figure into a vector
-    GT = plt.imread('../data/dataset_brains/1_1_gt.tif')
-    gt_mask = GT > 0
-    Y = gt_mask.flatten()  # reshapes the binary gt to a vector
+    X = X.reshape(-1, 1)
 
-    c, _ = seg.extract_coordinate_feature(I)  # producing a vector with all coordinates
-    X_data = np.concatenate((X, c), axis=1)  # extends each row with the respective coordinate of the pixel
-    X_norm, _ = seg.normalize_data(X_data)
+    I_blurred = ndimage.gaussian_filter(I, sigma=3)
+    Xb = I_blurred.flatten().T
+    Xb = Xb.reshape(-1, 1)
+
+    # add the coordinate feature
+    c, _ = seg.extract_coordinate_feature(I)
+    X_data2 = np.concatenate((Xb, c), axis=1)
+    X_norm, _ = seg.normalize_data(X_data2)
     N, M = X_norm.shape
 
     n = 100
@@ -270,7 +272,6 @@ def kmeans_clustering_test():
     # initialize cluster centers
     idx = np.random.randint(N, size=clusters)
     initial_w = X_norm[idx, :]
-    w_draw = initial_w
 
     # reshape into vector (needed by ngradient)
     w_vector = initial_w.reshape(clusters*M, 1)
@@ -280,43 +281,19 @@ def kmeans_clustering_test():
     kmeans_cost = np.empty(*xx.shape)  # line was kmeans_cost = np.empty(*xx.shape)
     kmeans_cost[:] = np.nan
 
-    fig = plt.figure(figsize=(14, 6))
-    ax = fig.add_subplot(121)
-    util.scatter_data(X_norm, Y, ax=ax)
-    line1, = ax.plot(w_draw[:, 0], w_draw[:, 1], "ok", markersize=5, label='W-vector')
-    ax.grid()
-    ax2 = fig.add_subplot(122, xlim=(0, num_iter), ylim=(0, 10))
-
-    text_str = 'k={}, g={:.2f}\ncost={:.2f}'.format(0, 0, 0)
-
-    txt2 = ax2.text(0.3, 0.95, text_str, bbox={'facecolor': 'green', 'alpha': 0.4, 'pad': 10}, transform=ax2.transAxes)
-
-    line2, = ax2.plot(xx, kmeans_cost, lw=2)
-    ax2.set_xlabel('Iteration')
-    ax2.set_ylabel('Cost')
-    ax2.grid()
-
     for k in np.arange(num_iter):
 
         # gradient ascent
         g = util.ngradient(fun, w_vector)
         change = mu * g
         w_vector = w_vector - change[:, np.newaxis]
-
-        # calculate cost for plotting
         kmeans_cost[k] = fun(w_vector)
-        text_str = 'k={}, cost={:.2f}'.format(k, kmeans_cost[k])
-        txt2.set_text(text_str)
 
-        # plot
-        line2.set_ydata(kmeans_cost)
-        w_draw_new = w_vector.reshape(clusters, M)
-        line1.set_data(w_draw_new[:, 0], w_draw_new[:, 1])
-        display(fig)
-        clear_output(wait=True)
-        plt.pause(.005)
-
-    # return kmeans_cost
+    w_final = w_vector.reshape((2, 2))
+    D = scipy.spatial.distance.cdist(X_norm, w_final, metric='euclidean')
+    min_index = np.argmin(D, axis=1)
+    I_final = min_index.reshape(I.shape)
+    plt.imshow(I_final)
 
 
 def nn_classifier_test_samples():
@@ -339,7 +316,7 @@ def generate_train_test(N, task):
     #
     # Input:
     #
-    # N             - Number of samples per classs
+    # N             - Number of samples per class
     # task          - String, either 'easy' or 'hard'
 
     if task == 'easy':
@@ -348,12 +325,11 @@ def generate_train_test(N, task):
         sigma1 = [[1, 0], [0, 1]]
         sigma2 = [[1, 0], [0, 1]]
 
-
     if task == 'hard':
-        mu1 =
-        mu2 =
-        sigma1 =
-        sigma2 =
+        mu1 = [0, 0]
+        mu2 = [0, 2]
+        sigma1 = [[3, 0], [0, 3]]
+        sigma2 = [[3, 0], [0, 3]]
 
     trainX, trainY = seg.generate_gaussian_data(N, mu1, mu2, sigma1, sigma2)
     testX, testY = seg.generate_gaussian_data(N, mu1, mu2, sigma1, sigma2)
@@ -362,23 +338,30 @@ def generate_train_test(N, task):
 
 
 def easy_hard_data_classifier_test():
-    #-------------------------------------------------------------------#
-    #TODO: generate and classify (using nn_classifier) 2 pairs of datasets (easy and hard)
-    # calculate classification error in each case
-    #-------------------------------------------------------------------#
-    pass
+
+    N = 100
+
+    trainX, trainY, testX, testY = generate_train_test(N, "easy")
+    predict_Y = seg.nn_classifier(trainX, trainY, testX)
+    class_err_ez = util.classification_error(testY, predict_Y)
+
+    trainX, trainY, testX, testY = generate_train_test(N, "hard")
+    predict_Y = seg.nn_classifier(trainX, trainY, testX)
+    class_err_hrd = util.classification_error(testY, predict_Y)
+
+    return class_err_ez, class_err_hrd
 
 
 def nn_classifier_test_brains(testDice=False):
 
     # Subject 1, slice 1 is the train data
-    X, Y, feature_labels_train = util.create_dataset(1,1,'brain')
+    X, Y, feature_labels_train = util.create_dataset(1, 1, 'brain')
     N = 1000
     ix = np.random.randint(len(X), size=N)
-    train_data = X[ix,:]
-    train_labels = Y[ix,:]
+    train_data = X[ix, :]
+    train_labels = Y[ix, :]
     # Subject 3, slice 1 is the test data
-    test_data, test_labels, feature_labels_test  = util.create_dataset(3,1,'brain')
+    test_data, test_labels, feature_labels_test = util.create_dataset(3, 1, 'brain')
 
     predicted_labels = seg.nn_classifier(train_data, train_labels, test_data)
     predicted_labels = predicted_labels.astype(bool)
@@ -392,47 +375,47 @@ def nn_classifier_test_brains(testDice=False):
     else:
         I = plt.imread('../data/dataset_brains/3_1_t1.tif')
         GT = plt.imread('../data/dataset_brains/3_1_gt.tif')
-        gt_mask = GT>0
-        gt_labels = gt_mask.flatten() # labels
+        gt_mask = GT > 0
+        gt_labels = gt_mask.flatten()  # labels
         predicted_mask = predicted_labels.reshape(I.shape)
-        fig = plt.figure(figsize=(15,5))
+        fig = plt.figure(figsize=(15, 5))
         ax1 = fig.add_subplot(131)
         ax1.imshow(I)
         ax2 = fig.add_subplot(132)
         ax2.imshow(predicted_mask)
-        ax3  = fig.add_subplot(133)
+        ax3 = fig.add_subplot(133)
         ax3.imshow(gt_mask)
 
 
 def knn_curve():
 
     # Load training and test data
-    train_data, train_labels, train_feature_labels = util.create_dataset(1,1,'brain')
-    test_data, test_labels, test_feature_labels = util.create_dataset(2,1,'brain')
+    train_data, train_labels, train_feature_labels = util.create_dataset(1, 1, 'brain')
+    test_data, test_labels, test_feature_labels = util.create_dataset(2, 1, 'brain')
     # Normalize data
     train_data, test_data = seg.normalize_data(train_data, test_data)
 
-    #Define parameters
+    # Define parameters
     num_iter = 3
     train_size = 100
-    k = np.array([1, 3, 5, 9, 15, 25, 100])
+    k = np.array([4, 5, 6, 7])
     # k = np.array([1, 5, 9])
 
-    #Store errors
+    # Store errors
     test_error = np.empty([len(k),num_iter])
     test_error[:] = np.nan
     dice = np.empty([len(k),num_iter])
     dice[:] = np.nan
 
-    ## Train and test with different values
+    # Train and test with different values
 
     for i in np.arange(len(k)):
         for j in np.arange(num_iter):
             print('k = {}, iter = {}'.format(k[i], j))
-            #Subsample training set
+            # Subsample training set
             ix = np.random.randint(len(train_data), size=train_size)
-            subset_train_data = train_data[ix,:]
-            subset_train_labels = train_labels[ix,:]
+            subset_train_data = train_data[ix, :]
+            subset_train_labels = train_labels[ix, :]
 
             predicted_test_labels = seg.knn_classifier(subset_train_data, subset_train_labels, test_data, k[i])
 
@@ -442,80 +425,80 @@ def knn_curve():
             # #Evaluate
             # predicted_test_labels = neigh.predict(test_data)
 
-            test_error[i,j] = util.classification_error(test_labels, predicted_test_labels)
-            dice[i,j] = util.dice_overlap(test_labels, predicted_test_labels)
+            test_error[i, j] = util.classification_error(test_labels, predicted_test_labels)
+            dice[i, j] = util.dice_overlap(test_labels, predicted_test_labels)
 
-    ## Display results
-    fig = plt.figure(figsize=(8,8))
+    # Display results
+    fig = plt.figure(figsize=(8, 8))
     ax1 = fig.add_subplot(111)
-    p1 = ax1.plot(k, np.mean(test_error,1), 'r', label='error')
-    p2 = ax1.plot(k, np.mean(dice,1), 'k', label='dice')
+    p1 = ax1.plot(k, np.mean(test_error, 1), 'r', label='error')
+    p2 = ax1.plot(k, np.mean(dice, 1), 'k', label='dice')
     ax1.set_xlabel('k')
     ax1.set_ylabel('error')
     ax1.grid()
     ax1.legend()
 
 
-# SECTION 2. Generalization and overfitting
+# SECTION 2. Generalization and over-fitting
 
 def learning_curve():
 
     # Load training and test data
-    train_data, train_labels = seg.generate_gaussian_data(1000)
-    test_data, test_labels = seg.generate_gaussian_data(1000)
+    # train_data, train_labels = seg.generate_gaussian_data(1000)
+    # test_data, test_labels = seg.generate_gaussian_data(1000)
+    test_data, test_labels, _ = util.create_dataset(3, 1, 'brain')
+    train_data, train_labels, _ = util.create_dataset(1, 1, 'brain')
     [train_data, test_data] = seg.normalize_data(train_data, test_data)
 
-    #Define parameters
-    train_sizes = np.array([1, 3, 10, 30, 100, 300])
+    # Define parameters
+    train_sizes = np.array([1, 3, 10, 30, 100, 300, 400, 500])
     k = 1
-    num_iter = 3  #How often to repeat the experiment
+    num_iter = 3  # How often to repeat the experiment
 
-    #Store errors
-    test_error = np.empty([len(train_sizes),num_iter])
+    # Store errors
+    test_error = np.empty([len(train_sizes), num_iter])
     test_error[:] = np.nan
-    test_dice = np.empty([len(train_sizes),num_iter])
+    test_dice = np.empty([len(train_sizes), num_iter])
     test_dice[:] = np.nan
+    train_error = np.empty([len(train_sizes), num_iter])
+    train_error[:] = np.nan
 
-    #------------------------------------------------------------------#
-    #TODO: Store errors for training data
-    #------------------------------------------------------------------#
-
-    ## Train and test with different values
+    # Train and test with different values
     for i in np.arange(len(train_sizes)):
         for j in np.arange(num_iter):
-            print('train_size = {}, iter = {}'.format(train_sizes[i], j))
-            #Subsample training set
-            ix = np.random.randint(len(train_data), size=train_sizes[i])
-            subset_train_data = train_data[ix,:]
-            subset_train_labels = train_labels[ix,:]
 
-            #Train classifier
+            print('train_size = {}, iter = {}'.format(train_sizes[i], j))
+
+            # Subsample training set
+            ix = np.random.randint(len(train_data), size=train_sizes[i])
+            subset_train_data = train_data[ix, :]
+            subset_train_labels = train_labels[ix, :]
+
+            # Train classifier
             neigh = KNeighborsClassifier(n_neighbors=k)
             neigh.fit(subset_train_data, subset_train_labels.ravel())
-            #Evaluate
+
+            # Evaluate
             predicted_test_labels = neigh.predict(test_data)
+            predicted_train_labels = neigh.predict(train_data)
 
             test_labels = test_labels.astype(bool)
             predicted_test_labels = predicted_test_labels.astype(bool)
 
-            test_error[i,j] = util.classification_error(test_labels, predicted_test_labels)
-            test_dice[i,j] = util.dice_overlap(test_labels, predicted_test_labels)
+            test_error[i, j] = util.classification_error(test_labels, predicted_test_labels)
+            train_error[i, j] = util.classification_error(train_labels, predicted_train_labels)
+            # test_dice[i, j] = util.dice_overlap(test_labels, predicted_test_labels)
 
-            #------------------------------------------------------------------#
-            #TODO: Predict training labels and evaluate
-            #------------------------------------------------------------------#
-
-    ## Display results
-    fig = plt.figure(figsize=(8,8))
+    # Display results
+    fig = plt.figure(figsize=(8, 8))
     ax1 = fig.add_subplot(111)
     x = np.log(train_sizes)
-    y_test = np.mean(test_error,1)
-    yerr_test = np.std(test_error,1)
+    y_test = np.mean(test_error, 1)
+    yerr_test = np.std(test_error, 1)
+    y_train = np.mean(train_error, 1)
+    yerr_train = np.std(train_error, 1)
     p1 = ax1.errorbar(x, y_test, yerr=yerr_test, label='Test error')
-
-    #------------------------------------------------------------------#
-    #TODO: Plot training size
-    #------------------------------------------------------------------#
+    p2 = ax1.errorbar(x, y_train, yerr=yerr_train, label='Train error')
 
     ax1.set_xlabel('Number of training samples (k)')
     ax1.set_ylabel('error')
@@ -644,63 +627,75 @@ def high_dimensions_output(X, ax, n_bins=20):
 
 def covariance_matrix_test():
 
-    N=100
-    mu1=[0,0]
-    mu2=[0,0]
-    sigma1=[[3,1],[1,1]]
-    sigma2=[[3,1],[1,1]]
+    N = 100
+    mu1 = [0, 0]
+    mu2 = [0, 0]
+    sigma1 = [[3, 1], [1, 1]]
+    sigma2 = [[3, 1], [1, 1]]
     X, Y = seg.generate_gaussian_data(N, mu1, mu2, sigma1, sigma2)
-    #------------------------------------------------------------------#
-    # TODO: Calculate the mean and covariance matrix of the data,
-    #  and compare them to the parameters you used as input.
-    #------------------------------------------------------------------#
+    # mu = np.mean(X)
+    sigma = np.cov(X.T)
+
+    return X, Y, sigma
 
 
 def eigen_vecval_test(sigma):
-    #------------------------------------------------------------------#
-    # TODO: Compute the eigenvectors and eigenvalues of the covariance matrix,
-    #  what two properties can you name about the eigenvectors? How can you verify these properties?
-    #  which eigenvalue is the largest and which is the smallest?
-    #------------------------------------------------------------------#
-    pass
+    # Input:
+    # sigma     - covariance matrix
+    # Output:
+    # v         - eigenvectors
+    # w         - eigenvalues
+
+    w, v = np.linalg.eig(sigma)
+    ix = np.argsort(w)[::-1]
+    w = w[ix]
+    v = v[:, ix]
+    return v, w
 
 
 def rotate_using_eigenvectors_test(X, Y, v):
-    #------------------------------------------------------------------#
-    # TODO: Rotate X using the eigenvectors
-    #------------------------------------------------------------------#
-    pass
+    # Input:
+    # X         - data
+    # Y         - labels
+    # v         - eigenvectors
+    # Output:
+    # X_rotated - transformed data
+
+    v_transp = v.T
+    X_rotated = v_transp.dot(X)
+
+    return X_rotated
 
 
 def test_mypca():
 
-    #Generates some toy data in 2D, computes PCA, and plots both datasets
-    N=100
-    mu1=[0,0]
-    mu2=[2,0]
-    sigma1=[[2,1],[1,1]]
-    sigma2=[[2,1],[1,1]]
+    # Generates some toy data in 2D, computes PCA, and plots both datasets
+    N = 100
+    mu1 = [0, 0]
+    mu2 = [2, 0]
+    sigma1 = [[2, 1], [1, 1]]
+    sigma2 = [[2, 1], [1, 1]]
 
     XG, YG = seg.generate_gaussian_data(N, mu1, mu2, sigma1, sigma2)
 
-    fig = plt.figure(figsize=(15,6))
+    fig = plt.figure(figsize=(15, 6))
     ax1 = fig.add_subplot(121)
 
-    util.scatter_data(XG,YG,ax=ax1)
+    util.scatter_data(XG, YG, ax=ax1)
     sigma = np.cov(XG, rowvar=False)
     w, v = np.linalg.eig(sigma)
-    ax1.plot([0, v[0,0]], [0, v[1,0]], c='g', linewidth=3, label='Eigenvector1')
-    ax1.plot([0, v[0,1]], [0, v[1,1]], c='k', linewidth=3, label='Eigenvector2')
+    ax1.plot([0, v[0, 0]], [0, v[1, 0]], c='g', linewidth=3, label='Eigenvector1')
+    ax1.plot([0, v[0, 1]], [0, v[1, 1]], c='k', linewidth=3, label='Eigenvector2')
     ax1.set_title('Original data')
     ax_settings(ax1)
 
     ax2 = fig.add_subplot(122)
     X_pca, v, w, fraction_variance = seg.mypca(XG)
-    util.scatter_data(X_pca,YG,ax=ax2)
+    util.scatter_data(X_pca, YG, ax=ax2)
     sigma2 = np.cov(X_pca, rowvar=False)
     w2, v2 = np.linalg.eig(sigma2)
-    ax2.plot([0, v2[0,0]], [0, v2[1,0]], c='g', linewidth=3, label='Eigenvector1')
-    ax2.plot([0, v2[0,1]], [0, v2[1,1]], c='k', linewidth=3, label='Eigenvector2')
+    ax2.plot([0, v2[0, 0]], [0, v2[1, 0]], c='g', linewidth=3, label='Eigenvector1')
+    ax2.plot([0, v2[0, 1]], [0, v2[1, 1]], c='k', linewidth=3, label='Eigenvector2')
     ax2.set_title('My PCA')
     ax_settings(ax2)
 
@@ -711,8 +706,8 @@ def test_mypca():
 
 
 def ax_settings(ax):
-    ax.set_xlim(-7,7)
-    ax.set_ylim(-7,7)
+    ax.set_xlim(-7, 7)
+    ax.set_ylim(-7, 7)
     ax.set_aspect('equal', adjustable='box')
     ax.grid()
 
@@ -725,44 +720,61 @@ def segmentation_combined_atlas_test():
     n = 5
     all_subjects = np.arange(n)
     train_slice = 1
-    tmp_data, tmp_labels, tmp_feature_labels = util.create_dataset(1,train_slice,task)
+    tmp_data, tmp_labels, tmp_feature_labels = util.create_dataset(1, train_slice, task)
     all_data_matrix = np.empty((tmp_data.shape[0], tmp_data.shape[1], n))
     all_labels_matrix = np.empty((tmp_labels.shape[0], n))
 
-    #Load datasets once
+    # Load datasets once
     for i in all_subjects:
-        train_data, train_labels, train_feature_labels = util.create_dataset(i+1,train_slice,task)
-        all_data_matrix[:,:,i] = train_data
-        all_labels_matrix[:,i] = train_labels.ravel()
+        train_data, train_labels, train_feature_labels = util.create_dataset(i+1, train_slice, task)
+        all_data_matrix[:, :, i] = train_data
+        all_labels_matrix[:, i] = train_labels.ravel()
 
-    #------------------------------------------------------------------#
-    # TODO: Use provided code to Combine labels of training images,
-    #  Convert combined label into mask image,
-    #  Convert true label into mask image, and
-    #  View both masks on the same axis,
-    #  Also calculate dice coefficient and error
-    #------------------------------------------------------------------#
+    # Combine labels of training images:
+    predicted_labels = stats.mode(all_labels_matrix[:, :4], axis=1)[0]
+
+    # Convert combined label into mask image:
+    predicted_mask = predicted_labels.reshape(240, 240)
+
+    # Convert true label into mask image:
+    true_mask = all_labels_matrix[:, 4].reshape(240, 240)
+
+    # View both masks on the same axis using imshow()
+    plt.imshow(predicted_mask, alpha=0.6)
+    plt.imshow(true_mask, alpha=0.6)
+
+    # Calculate the dice coefficient and error
+    err = util.classification_error(true_mask, predicted_mask)
+    DSC = util.dice_overlap(true_mask, predicted_mask)
+
+    # Show the values
+    print("err = " + str(err))
+    print("DSC = " + str(DSC))
+
+    return err, DSC
 
 
 def segmentation_combined_atlas_minmax_test():
+
     task = 'brain'
     n = 5
     all_subjects = np.arange(n)
     train_slice = 1
-    tmp_data, tmp_labels, tmp_feature_labels = util.create_dataset(1,train_slice,task)
+    tmp_data, tmp_labels, tmp_feature_labels = util.create_dataset(1, train_slice, task)
     all_data_matrix = np.empty((tmp_data.shape[0], tmp_data.shape[1], n))
     all_labels_matrix = np.empty((tmp_labels.shape[0], n))
 
-    #Load datasets once
+    # Load datasets once
     for i in all_subjects:
-        train_data, train_labels, train_feature_labels = util.create_dataset(i+1,train_slice,task)
-        all_data_matrix[:,:,i] = train_data
-        all_labels_matrix[:,i] = train_labels.ravel()
+        train_data, train_labels, train_feature_labels = util.create_dataset(i+1, train_slice, task)
+        all_data_matrix[:, :, i] = train_data
+        all_labels_matrix[:, i] = train_labels.ravel()
 
+    # documentation of min and max
     predicted_labels_min = seg.segmentation_combined_atlas(all_labels_matrix, combining='min')
     predicted_labels_max = seg.segmentation_combined_atlas(all_labels_matrix, combining='max')
 
-    test_labels = all_labels_matrix[:,4].astype(bool)
+    test_labels = all_labels_matrix[:, 4].astype(bool)
 
     print('Combining method = min:')
     err = util.classification_error(test_labels, predicted_labels_min)

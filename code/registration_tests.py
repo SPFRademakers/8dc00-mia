@@ -169,7 +169,7 @@ def ls_affine_test():
 
     Xmt = Te.dot(Xm)
 
-    fig = plt.figure(figsize=(12,5))
+    fig = plt.figure(figsize=(12, 5))
 
     ax1 = fig.add_subplot(131)
     ax2 = fig.add_subplot(132)
